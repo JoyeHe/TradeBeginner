@@ -1,0 +1,33 @@
+# Secrets & local env
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Test & lint caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.log
+
+# Local runtime data
+data/chroma/
+data/openbb-ssl/
+*.pem
+*.key
+*.crt
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/

@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tradebeginner"
+version = "0.1.0"
+description = "Multi-agent trading system with Agno, OpenBB, TrendRadar, and Agent Lightning-ready RL traces."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "agno>=2.1.0",
+  "openai>=1.109.0",
+  "fastapi>=0.116.0",
+  "uvicorn>=0.35.0",
+  "pydantic>=2.11.0",
+  "pydantic-settings>=2.10.0",
+  "sqlalchemy[asyncio]>=2.0.40",
+  "asyncpg>=0.30.0",
+  "structlog>=25.4.0",
+  "tenacity>=9.1.0",
+  "chromadb>=1.0.20",
+  "openbb>=4.7.0",
+  "httpx>=0.28.0",
+  "feedparser>=6.0.11",
+  "pandas>=2.3.0",
+  "numpy>=2.3.0",
+  "pandas-ta-openbb>=0.4.20",
+  "alpaca-py>=0.39.0",
+  "python-dateutil>=2.9.0",
+  "yfinance>=0.2.60",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.4.0",
+  "pytest-asyncio>=1.1.0",
+  "ruff>=0.12.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["config*", "schemas*", "memory*", "agents*", "risk*", "tools*", "orchestrator*", "api*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+  "unit: Unit tests (no external dependencies)",
+  "integration: Integration tests (may need database)",
+  "safety: Safety-critical tests (must never be skipped)",
+  "slow: Tests that take > 5 seconds",
+]
+filterwarnings = [
+  "error::DeprecationWarning",
+  "ignore:Inheritance class ClientSession from ClientSession is discouraged:DeprecationWarning",
+  "ignore:Using `@model_validator` with mode='after' on a classmethod is deprecated.*",
+]
+

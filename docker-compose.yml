@@ -1,0 +1,41 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tradebeginner-db
+    environment:
+      POSTGRES_USER: trade
+      POSTGRES_PASSWORD: trade
+      POSTGRES_DB: tradebeginner
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trade -d tradebeginner"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tradebeginner-app
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      ATS_POSTGRES_URL: postgresql+asyncpg://trade:trade@db:5432/tradebeginner
+      ATS_CHROMA_PERSIST_DIR: /app/data/chroma
+      ATS_API_HOST: 0.0.0.0
+      ATS_API_PORT: 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ../TrendRadar:/app/TrendRadar:ro
+
+volumes:
+  postgres_data:

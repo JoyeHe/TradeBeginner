@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TradeBeginner Dashboard</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0f172a;--panel:#111827;--muted:#334155;--text:#e5e7eb;--sub:#94a3b8;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--accent:#3b82f6;--tab-active:#1e3a5f}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
+    .wrap{max-width:1260px;margin:0 auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--muted);margin-bottom:14px}
+    header h1{font-size:20px;font-weight:700}
+    .pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;border:1px solid var(--muted);color:var(--sub)}
+    .tabs{display:flex;gap:4px;margin-bottom:14px}
+    .tabs button{background:var(--panel);border:1px solid var(--muted);color:var(--sub);border-radius:8px 8px 0 0;padding:10px 18px;cursor:pointer;font-size:14px;font-weight:500;transition:background .15s}
+    .tabs button.active{background:var(--tab-active);color:var(--text);border-bottom-color:var(--tab-active)}
+    .tab-panel{display:none}
+    .tab-panel.active{display:block}
+    .row{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+    @media(max-width:860px){.row{grid-template-columns:1fr}}
+    .card{background:var(--panel);border:1px solid var(--muted);border-radius:12px;padding:16px;margin-bottom:14px}
+    .card .t{font-size:15px;font-weight:600;margin-bottom:8px}
+    .card .sub{color:var(--sub);font-size:13px;margin-bottom:8px}
+    textarea,input[type=text]{width:100%;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);padding:10px;font-size:14px;resize:vertical}
+    textarea{min-height:70px}
+    button{border-radius:8px;border:1px solid var(--muted);color:var(--text);padding:10px 14px;font-size:14px;cursor:pointer;background:var(--panel)}
+    .btn-primary{background:var(--accent);border-color:#2563eb}
+    .btn-ok{background:#064e3b;border-color:#065f46}
+    .btn-warn{background:#78350f;border-color:#92400e}
+    .btn-bad{background:#7f1d1d;border-color:#991b1b}
+    .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+    pre{margin:0;white-space:pre-wrap;word-wrap:break-word;background:#0b1220;border:1px solid var(--muted);border-radius:8px;padding:10px;font-size:12px;max-height:400px;overflow:auto;margin-top:8px}
+    .kpi{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;margin-top:6px}
+    .kpi span{color:var(--sub)}
+    .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:6px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .hide{display:none}
+    .news-list{max-height:500px;overflow:auto}
+    .news-item{display:block;padding:10px 12px;margin:4px 0;border:1px solid var(--muted);border-radius:8px;background:#0b1220;color:var(--text);text-decoration:none;transition:border-color .15s}
+    .news-item:hover{border-color:var(--accent)}
+    .news-item .ni-title{font-size:14px;font-weight:500;margin-bottom:4px;color:var(--text)}
+    .news-item .ni-meta{font-size:12px;color:var(--sub)}
+    .news-item .ni-sentiment{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px}
+    .ni-pos{background:#064e3b;color:#6ee7b7}
+    .ni-neg{background:#7f1d1d;color:#fca5a5}
+    .ni-neu{background:#1e293b;color:#94a3b8}
+    .bars-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+    .bars-table th,.bars-table td{padding:4px 8px;border-bottom:1px solid var(--muted);text-align:right}
+    .bars-table th{color:var(--sub);font-weight:500;position:sticky;top:0;background:var(--panel)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>TradeBeginner</h1>
+    <div>
+      <span class="pill" id="modePill">Paper Trading</span>
+      <span class="pill" id="statusPill">--</span>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="active" data-tab="news">News Search</button>
+    <button data-tab="market">Market Data</button>
+    <button data-tab="analysis">Analysis</button>
+    <button data-tab="strategy">Strategy</button>
+    <button data-tab="system">System</button>
+  </nav>
+
+  <!-- ───────────── TAB 1: News Search ───────────── -->
+  <div id="tab-news" class="tab-panel active">
+    <div class="card">
+      <div class="t">Search News &amp; Sentiment</div>
+      <div class="sub">Natural-language search. TrendRadar (hot rankings + RSS) is queried first; Finnhub/NewsAPI as secondary sources.</div>
+      <input type="text" id="newsQuery" placeholder='e.g. "the stock price of AAPL" or "Fed interest rate decision"' />
+      <div class="btns">
+        <button class="btn-primary" id="btnNewsSearch">Search<span class="spinner hide" id="newsSpinner"></span></button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="t">AI Summary</div>
+      <div id="newsSummary" style="font-size:14px;color:var(--text);line-height:1.6;min-height:40px">Search results will appear here with an AI-generated interpretation.</div>
+      <div class="kpi" id="newsKpi" style="margin-top:8px"></div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <div class="t" style="cursor:pointer" onclick="this.parentElement.querySelector('.news-list').classList.toggle('hide')">▸ TrendRadar Results <span id="trCount" class="pill">0</span></div>
+        <div id="trResults" class="news-list">No TrendRadar results yet.</div>
+      </div>
+      <div class="card">
+        <div class="t" style="cursor:pointer" onclick="this.parentElement.querySelector('.news-list').classList.toggle('hide')">▸ Finnhub / NewsAPI Results <span id="apiCount" class="pill">0</span></div>
+        <div id="apiResults" class="news-list">No API results yet.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────── TAB 2: Market Data ───────────── -->
+  <div id="tab-market" class="tab-panel">
+    <div class="card">
+      <div class="t">Financial Data Tracker</div>
+      <div class="sub">Look up price data and technical indicators. Adjust the date window and data interval below.</div>
+      <input type="text" id="marketQuery" placeholder='e.g. "BTC" or "AAPL MSFT"' />
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+        <div>
+          <label class="sub" for="mktDateFrom">Date From</label>
+          <input type="date" id="mktDateFrom" />
+        </div>
+        <div>
+          <label class="sub" for="mktDateTo">Date To</label>
+          <input type="date" id="mktDateTo" />
+        </div>
+        <div>
+          <label class="sub" for="mktInterval">Interval</label>
+          <select id="mktInterval" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);font-size:14px">
+            <option value="1d" selected>1 Day</option>
+            <option value="1h">1 Hour</option>
+            <option value="30m">30 Min</option>
+            <option value="15m">15 Min</option>
+            <option value="5m">5 Min</option>
+            <option value="1m">1 Min</option>
+            <option value="4h">4 Hour</option>
+            <option value="1wk">1 Week</option>
+            <option value="1mo">1 Month</option>
+          </select>
+        </div>
+      </div>
+      <div class="btns">
+        <button class="btn-primary" id="btnMarketSearch">Lookup<span class="spinner hide" id="marketSpinner"></span></button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="t">Indicators</div>
+      <div class="kpi" id="marketKpi" style="margin-bottom:6px"></div>
+      <pre id="marketIndicators">No lookup yet.</pre>
+    </div>
+    <div class="card">
+      <div class="t">OHLCV Bars</div>
+      <div id="marketBarsContainer" style="max-height:400px;overflow:auto">No data yet.</div>
+    </div>
+  </div>
+
+  <!-- ───────────── TAB 3: Analysis Flow ───────────── -->
+  <div id="tab-analysis" class="tab-panel">
+    <div class="card">
+      <div class="t">Flow 1 — Baseline Analysis</div>
+      <div class="sub">News + market evidence → structured analysis → strategy → backtest. Flow 2 lets you correct the analysis and compare outcomes.</div>
+      <input type="text" id="analysisQuery" placeholder='e.g. "AAPL earnings outlook" or "Fed rate impact on tech"' />
+      <input type="text" id="analysisTickers" placeholder="Optional tickers (space-separated): AAPL MSFT" style="margin-top:8px" />
+      <div class="btns">
+        <button class="btn-primary" id="btnRunBaseline">Run Baseline<span class="spinner hide" id="analysisSpinner"></span></button>
+        <button id="btnRefreshLibrary">Strategy Library</button>
+        <button id="btnRefreshPrefs">Preferences</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <div class="t">Baseline Analysis</div>
+        <div id="baselineSummary" style="font-size:14px;line-height:1.6;min-height:40px;color:var(--sub)">Run baseline to see analysis.</div>
+        <pre id="baselineAnalysis">No analysis yet.</pre>
+      </div>
+      <div class="card">
+        <div class="t">Baseline Strategy &amp; Backtest</div>
+        <pre id="baselineStrategy">No strategy yet.</pre>
+      </div>
+    </div>
+    <div class="card">
+      <div class="t">Flow 2 — Your Feedback (AI Intuition)</div>
+      <div class="sub">Analysis ID: <code id="currentAnalysisId">None</code></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+        <div>
+          <label class="sub" for="feedbackVerdict">Overall Verdict</label>
+          <select id="feedbackVerdict" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);font-size:14px">
+            <option value="partial" selected>Partial — some corrections</option>
+            <option value="agree">Agree — analysis is fine</option>
+            <option value="disagree">Disagree — major revision</option>
+          </select>
+        </div>
+        <div>
+          <label class="sub" for="feedbackDimension">Dimension (optional)</label>
+          <select id="feedbackDimension" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);font-size:14px">
+            <option value="market_outlook">Market Outlook</option>
+            <option value="sentiment">Sentiment</option>
+            <option value="news_interpretation">News Interpretation</option>
+            <option value="affected_assets">Affected Assets</option>
+            <option value="time_horizon">Time Horizon</option>
+            <option value="risks">Risks</option>
+          </select>
+        </div>
+      </div>
+      <textarea id="analysisFeedbackText" placeholder="Describe what the AI got wrong or what you'd emphasize differently..." style="margin-top:8px;min-height:70px"></textarea>
+      <div class="btns">
+        <button class="btn-warn" id="btnSubmitFeedback">Submit Feedback &amp; Revise<span class="spinner hide" id="feedbackSpinner"></span></button>
+        <button id="btnCompareAnalysis">Compare Baseline vs Revised</button>
+      </div>
+    </div>
+    <div class="row">
+      <div class="card">
+        <div class="t">Revised Analysis</div>
+        <div id="revisedSummary" style="font-size:14px;line-height:1.6;min-height:40px;color:var(--sub)">Submit feedback to see revised analysis.</div>
+        <pre id="revisedAnalysis">No revision yet.</pre>
+      </div>
+      <div class="card">
+        <div class="t">Compare &amp; Library</div>
+        <pre id="compareResults">No comparison yet.</pre>
+        <pre id="libraryResults" style="margin-top:8px;max-height:200px">Library not loaded.</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────── TAB 4: Strategy ───────────── -->
+  <div id="tab-strategy" class="tab-panel">
+    <div class="row">
+      <div>
+        <div class="card">
+          <div class="t">Request Strategy</div>
+          <div class="sub">Describe what strategy you want, or use the auto-generate button for a system-default strategy.</div>
+          <textarea id="strategyInput" placeholder='e.g. "Give me a strategy for holding BTC for 90 days" or "What stock should I buy in Chinese market?"'></textarea>
+          <div class="btns">
+            <button class="btn-primary" id="btnUserStrategy">Generate from Request<span class="spinner hide" id="stratSpinner"></span></button>
+            <button id="btnAutoStrategy">Auto-Generate</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="t">Manage Strategy</div>
+          <div class="sub">Current Strategy ID: <code id="currentStrategy">None</code></div>
+          <div class="btns">
+            <button id="btnGetStrategy">Refresh</button>
+            <button class="btn-ok" id="btnApprove">Approve</button>
+            <button class="btn-bad" id="btnReject">Reject</button>
+          </div>
+          <textarea id="feedbackInput" placeholder="Refinement feedback (optional)" style="margin-top:8px;min-height:50px"></textarea>
+          <div class="btns"><button class="btn-warn" id="btnRefine">Refine</button></div>
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="t">AI Strategy Summary</div>
+          <div id="strategySummary" style="font-size:14px;color:var(--text);line-height:1.6;min-height:40px">Generate a strategy to see the AI summary here.</div>
+        </div>
+        <div class="card">
+          <div class="t">Strategy Details (JSON)</div>
+          <pre id="strategyResults">No strategy yet.</pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ───────────── TAB 4: System ───────────── -->
+  <div id="tab-system" class="tab-panel">
+    <div class="row">
+      <div class="card">
+        <div class="t">System Status</div>
+        <button id="btnRefreshStatus">Refresh</button>
+        <pre id="statusBox">Loading...</pre>
+      </div>
+      <div class="card">
+        <div class="t">Portfolio</div>
+        <button id="btnRefreshPortfolio">Refresh</button>
+        <pre id="portfolioBox">Loading...</pre>
+      </div>
+    </div>
+    <div class="card">
+      <div class="t">News Digest (Background Cycle)</div>
+      <button id="btnRefreshNews">Refresh</button>
+      <pre id="newsDigestBox">Loading...</pre>
+    </div>
+    <div class="card">
+      <div class="t">Recent Episodes</div>
+      <button id="btnRefreshEpisodes">Refresh</button>
+      <pre id="episodesBox">Loading...</pre>
+    </div>
+    <div class="card">
+      <div class="t">Behavior Stats</div>
+      <button id="btnRefreshBehavior">Refresh</button>
+      <pre id="behaviorBox">Loading...</pre>
+    </div>
+    <div class="card">
+      <div class="t">Response Log</div>
+      <pre id="logBox">Ready.</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const API="";
+let currentStrategyId=null;
+const $=id=>document.getElementById(id);
+const escapeHtml=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const pretty=(id,o)=>$(id).textContent=JSON.stringify(o,null,2);
+const friendlySummary=(text,fallback)=>{if(!text)return fallback||"No summary available.";if(/failed to deserialize|invalid_request|error code/i.test(text))return fallback||"Summary unavailable — see strategy details below.";return text;};
+const log=(label,obj)=>{const c=$("logBox").textContent;$("logBox").textContent=`[${new Date().toLocaleTimeString()}] ${label}\n${JSON.stringify(obj,null,2)}\n\n${c}`;};
+const setSid=sid=>{currentStrategyId=sid||null;$("currentStrategy").textContent=currentStrategyId||"None";};
+const spin=(id,on)=>$(id).classList.toggle("hide",!on);
+
+function renderNewsItems(items,containerId){
+  const c=$(containerId);
+  if(!items||!items.length){c.innerHTML='<div style="color:var(--sub);padding:8px">No results.</div>';return;}
+  c.innerHTML=items.map(i=>{
+    const s=i.sentiment_score??0;
+    const cls=s>0.1?'ni-pos':s<-0.1?'ni-neg':'ni-neu';
+    const label=s>0?`+${s.toFixed(2)}`:s.toFixed(2);
+    const title=escapeHtml(i.title||i.summary||'(no title)');
+    const plat=escapeHtml(i.metadata?.platform||i.source||'?');
+    const cat=escapeHtml(i.category||'');
+    const url=i.url;
+    const safeUrl=url&&/^https?:\/\//i.test(url)?escapeHtml(url):'';
+    const tag=safeUrl?'a':'div';
+    const href=safeUrl?` href="${safeUrl}" target="_blank" rel="noopener"`:'';
+    return `<${tag} class="news-item"${href}><div class="ni-title">${title}</div><div class="ni-meta">${plat}${cat?' · '+cat:''}<span class="ni-sentiment ${cls}">${label}</span></div></${tag}>`;
+  }).join('');
+}
+
+async function call(path,opts={}){
+  const res=await fetch(`${API}${path}`,{headers:{"Content-Type":"application/json"},...opts});
+  const body=await res.json().catch(()=>({}));
+  if(!res.ok)throw{status:res.status,body};
+  return body;
+}
+
+/* ── Tabs ── */
+document.querySelectorAll(".tabs button").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    $("tab-"+btn.dataset.tab).classList.add("active");
+  });
+});
+
+/* ── Tab 1: News Search ── */
+$("btnNewsSearch").onclick=async()=>{
+  const q=$("newsQuery").value.trim();if(!q)return;
+  spin("newsSpinner",true);$("newsSummary").textContent="Searching...";
+  try{
+    const out=await call("/news/search",{method:"POST",body:JSON.stringify({query:q})});
+    const src=out.source_breakdown||{};const srcText=Object.entries(src).map(([k,v])=>`${k}: ${v}`).join(", ")||"N/A";
+    const interp=out.llm_interpretation||{};const interpText=interp.query?`"${interp.query}" (${interp.search_mode})`:"direct";
+    const trItems=out.trendradar_items||[];const apiItems=out.api_items||[];
+    $("newsKpi").innerHTML=`<div><span>Total:</span> ${out.item_count}</div><div><span>TrendRadar:</span> ${trItems.length}</div><div><span>API:</span> ${apiItems.length}</div><div><span>Sentiment:</span> ${out.digest?.overall_market_sentiment?.toFixed(2)??"-"}</div><div><span>LLM Query:</span> ${interpText}</div>`;
+    $("newsSummary").textContent=out.llm_summary||"No AI summary available (check LLM API key).";
+    $("trCount").textContent=trItems.length;
+    $("apiCount").textContent=apiItems.length;
+    renderNewsItems(trItems,"trResults");
+    renderNewsItems(apiItems,"apiResults");
+    log("news_search",{query:q,tr:trItems.length,api:apiItems.length,sources:src});
+  }catch(e){$("newsSummary").textContent="Search failed.";$("trResults").innerHTML="Error";$("apiResults").innerHTML="Error";log("news_search_error",e);}
+  spin("newsSpinner",false);
+};
+$("newsQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnNewsSearch").click();});
+
+/* ── Tab 2: Market Data ── */
+{
+  const dFrom=$("mktDateFrom"),dTo=$("mktDateTo");
+  const today=new Date().toISOString().slice(0,10);
+  const d100=new Date(Date.now()-100*86400000).toISOString().slice(0,10);
+  dFrom.value=d100;dTo.value=today;
+}
+$("btnMarketSearch").onclick=async()=>{
+  const q=$("marketQuery").value.trim();if(!q)return;
+  spin("marketSpinner",true);
+  const payload={query:q,interval:$("mktInterval").value};
+  if($("mktDateFrom").value)payload.start_date=$("mktDateFrom").value;
+  if($("mktDateTo").value)payload.end_date=$("mktDateTo").value;
+  try{
+    const out=await call("/market/search",{method:"POST",body:JSON.stringify(payload)});
+    const tickers=out.tickers||[];
+    $("marketKpi").innerHTML=`<div><span>Tickers:</span> ${tickers.join(", ")}</div><div><span>Range:</span> ${out.start_date} → ${out.end_date}</div><div><span>Interval:</span> ${out.interval}</div>`;
+    const ind={};
+    for(const [tk,d] of Object.entries(out.data||{})){
+      ind[tk]={bars:d.bars_count,close:d.last_bar?.close,rsi:d.indicators?.rsi_14,sma20:d.indicators?.sma_20,sma50:d.indicators?.sma_50,macd:d.indicators?.macd,adx:d.indicators?.adx};
+    }
+    pretty("marketIndicators",ind);
+    let tableHtml='';
+    for(const [tk,d] of Object.entries(out.data||{})){
+      const bars=d.bars||[];
+      tableHtml+=`<div style="margin-bottom:8px"><strong>${tk}</strong> (${bars.length} bars)</div>`;
+      tableHtml+='<table class="bars-table"><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead><tbody>';
+      for(const b of bars.slice().reverse()){
+        tableHtml+=`<tr><td style="text-align:left">${b.date?.slice(0,16)||''}</td><td>${b.open}</td><td>${b.high}</td><td>${b.low}</td><td>${b.close}</td><td>${(b.volume||0).toLocaleString()}</td></tr>`;
+      }
+      tableHtml+='</tbody></table>';
+    }
+    $("marketBarsContainer").innerHTML=tableHtml||'No bars.';
+    log("market_search",{query:q,tickers,interval:out.interval});
+  }catch(e){pretty("marketIndicators",e);$("marketBarsContainer").innerHTML='Error';log("market_search_error",e);}
+  spin("marketSpinner",false);
+};
+$("marketQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnMarketSearch").click();});
+
+/* ── Tab 3: Analysis Flow ── */
+let currentAnalysisId=null;
+const setAid=id=>{currentAnalysisId=id||null;$("currentAnalysisId").textContent=currentAnalysisId||"None";};
+const renderAnalysisSummary=(elId,analysis)=>{
+  if(!analysis){$(elId).textContent="No analysis.";return;}
+  const dir=analysis.outlook?.direction||"?";
+  const conf=(analysis.outlook?.confidence??0).toFixed(2);
+  const score=(analysis.sentiment?.overall_score??0).toFixed(2);
+  $(elId).textContent=`${dir.toUpperCase()} outlook (confidence ${conf}, sentiment ${score}). ${analysis.outlook?.narrative||""}`.slice(0,600);
+};
+$("btnRunBaseline").onclick=async()=>{
+  const q=$("analysisQuery").value.trim();if(!q)return;
+  spin("analysisSpinner",true);
+  $("baselineSummary").textContent="Running baseline flow...";
+  const tickers=$("analysisTickers").value.trim().split(/\s+/).filter(Boolean);
+  const payload={query:q};if(tickers.length)payload.tickers=tickers;
+  try{
+    const out=await call("/analysis/run-baseline",{method:"POST",body:JSON.stringify(payload)});
+    setAid(out.analysis_id);
+    renderAnalysisSummary("baselineSummary",out.baseline_analysis);
+    pretty("baselineAnalysis",out.baseline_analysis);
+    pretty("baselineStrategy",{strategy:out.baseline_strategy,reward:out.baseline_reward});
+    if(out.baseline_strategy?.strategy_id)setSid(out.baseline_strategy.strategy_id);
+    $("revisedAnalysis").textContent="No revision yet.";
+    $("revisedSummary").textContent="Submit feedback to see revised analysis.";
+    $("compareResults").textContent="No comparison yet.";
+    log("analysis_baseline",out);
+  }catch(e){
+    $("baselineSummary").textContent="Baseline failed.";
+    pretty("baselineAnalysis",e);log("analysis_baseline_error",e);
+  }
+  spin("analysisSpinner",false);
+};
+$("btnSubmitFeedback").onclick=async()=>{
+  if(!currentAnalysisId)return log("analysis_feedback","No analysis selected");
+  spin("feedbackSpinner",true);
+  const payload={
+    overall_verdict:$("feedbackVerdict").value,
+    free_text:$("analysisFeedbackText").value.trim()||null,
+    dimension_feedbacks:[{
+      dimension:$("feedbackDimension").value,
+      verdict:$("feedbackVerdict").value,
+      correction:$("analysisFeedbackText").value.trim()||null
+    }]
+  };
+  try{
+    const out=await call(`/analysis/${currentAnalysisId}/feedback`,{method:"POST",body:JSON.stringify(payload)});
+    renderAnalysisSummary("revisedSummary",out.revised_analysis);
+    pretty("revisedAnalysis",out.revised_analysis);
+    pretty("baselineStrategy",{baseline:out.baseline_strategy,revised:out.feedback_strategy,rewards:{baseline:out.baseline_reward,feedback:out.feedback_reward}});
+    if(out.feedback_strategy?.strategy_id)setSid(out.feedback_strategy.strategy_id);
+    log("analysis_feedback",out);
+  }catch(e){
+    $("revisedSummary").textContent="Feedback failed.";
+    pretty("revisedAnalysis",e);log("analysis_feedback_error",e);
+  }
+  spin("feedbackSpinner",false);
+};
+$("btnCompareAnalysis").onclick=async()=>{
+  if(!currentAnalysisId)return;
+  try{const out=await call(`/analysis/${currentAnalysisId}/compare`);pretty("compareResults",out);log("analysis_compare",out);}catch(e){pretty("compareResults",e);log("analysis_compare_error",e);}
+};
+$("btnRefreshLibrary").onclick=async()=>{
+  try{const out=await call("/library/strategies");pretty("libraryResults",out);log("strategy_library",out);}catch(e){pretty("libraryResults",e);}
+};
+$("btnRefreshPrefs").onclick=async()=>{
+  try{const out=await call("/library/preferences");pretty("libraryResults",out);log("preferences",out);}catch(e){pretty("libraryResults",e);}
+};
+$("analysisQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnRunBaseline").click();});
+
+/* ── Tab 4: Strategy ── */
+$("btnUserStrategy").onclick=async()=>{
+  const req=$("strategyInput").value.trim();if(!req)return;
+  spin("stratSpinner",true);$("strategySummary").textContent="Generating strategy...";
+  try{
+    const out=await call("/strategy/user-request",{method:"POST",body:JSON.stringify({request:req})});
+    setSid(out?.strategy?.strategy_id);
+    $("strategySummary").textContent=friendlySummary(out.summary,out?.strategy?.rationale);
+    pretty("strategyResults",out);log("user_strategy",out);
+  }catch(e){$("strategySummary").textContent="Generation failed.";pretty("strategyResults",e);log("user_strategy_error",e);}
+  spin("stratSpinner",false);
+};
+$("btnAutoStrategy").onclick=async()=>{
+  spin("stratSpinner",true);$("strategySummary").textContent="Auto-generating strategy...";
+  try{
+    const out=await call("/strategy/request-with-summary",{method:"POST",body:JSON.stringify({})});
+    setSid(out?.strategy?.strategy_id);
+    $("strategySummary").textContent=friendlySummary(out.summary,out?.strategy?.rationale);
+    pretty("strategyResults",out);log("auto_strategy",out);
+  }catch(e){$("strategySummary").textContent="Generation failed.";pretty("strategyResults",e);log("auto_strategy_error",e);}
+  spin("stratSpinner",false);
+};
+$("btnGetStrategy").onclick=async()=>{
+  if(!currentStrategyId)return log("get_strategy","No strategy selected");
+  try{const out=await call(`/strategy/${currentStrategyId}`);pretty("strategyResults",out);log("get_strategy",out);}catch(e){log("get_strategy_error",e);}
+};
+$("btnApprove").onclick=async()=>{
+  if(!currentStrategyId)return;
+  try{
+    let status=await call(`/strategy/${currentStrategyId}`);
+    for(let i=0;i<12&&status.status==="evaluating";i++){
+      await new Promise(r=>setTimeout(r,1500));
+      status=await call(`/strategy/${currentStrategyId}`);
+    }
+    const out=await call(`/strategy/${currentStrategyId}/approve`,{method:"POST",body:JSON.stringify({})});
+    pretty("strategyResults",out);log("approve",out);
+  }catch(e){log("approve_error",e);}
+  refreshPortfolio();refreshStatus();
+};
+$("btnReject").onclick=async()=>{
+  if(!currentStrategyId)return;
+  try{const out=await call(`/strategy/${currentStrategyId}/reject`,{method:"POST",body:JSON.stringify({reason:"Rejected from dashboard"})});pretty("strategyResults",out);log("reject",out);}catch(e){log("reject_error",e);}
+  refreshStatus();
+};
+$("btnRefine").onclick=async()=>{
+  if(!currentStrategyId)return;
+  const fb=$("feedbackInput").value.trim();if(!fb)return log("refine","Feedback required");
+  try{
+    const out=await call(`/strategy/${currentStrategyId}/refine`,{method:"POST",body:JSON.stringify({feedback:fb})});
+    setSid(out?.strategy?.strategy_id||currentStrategyId);pretty("strategyResults",out);log("refine",out);
+  }catch(e){log("refine_error",e);}
+};
+
+/* ── Tab 5: System ── */
+async function refreshStatus(){try{const s=await call("/system/status");pretty("statusBox",s);$("statusPill").textContent=s.news_fresh&&s.market_fresh?"Healthy":"Stale";$("modePill").textContent=s.paper_trading?"Paper Trading":"Live Trading";}catch(e){pretty("statusBox",e);}}
+async function refreshPortfolio(){try{pretty("portfolioBox",await call("/portfolio"));}catch(e){pretty("portfolioBox",e);}}
+async function refreshDigest(){try{pretty("newsDigestBox",await call("/news/digest"));}catch(e){pretty("newsDigestBox",e);}}
+async function refreshEpisodes(){try{pretty("episodesBox",await call("/history/episodes?n=10"));}catch(e){pretty("episodesBox",e);}}
+async function refreshBehavior(){try{pretty("behaviorBox",await call("/behavior/stats"));}catch(e){pretty("behaviorBox",e);}}
+$("btnRefreshStatus").onclick=refreshStatus;
+$("btnRefreshPortfolio").onclick=refreshPortfolio;
+$("btnRefreshNews").onclick=refreshDigest;
+$("btnRefreshEpisodes").onclick=refreshEpisodes;
+$("btnRefreshBehavior").onclick=refreshBehavior;
+
+refreshStatus();refreshPortfolio();refreshDigest();refreshEpisodes();refreshBehavior();
+</script>
+</body>
+</html>

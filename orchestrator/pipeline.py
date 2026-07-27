@@ -318,7 +318,7 @@ class TradingPipeline:
         return self.analysis_flow.get_session_payload(analysis_id)
 
     async def compare_analysis_session(self, analysis_id: str) -> dict:
-        return self.analysis_flow.compare_session(analysis_id)
+        return await self.analysis_flow.compare_session(analysis_id)
 
     async def list_strategy_library(self, user_id: str = "default", limit: int = 50) -> list[dict]:
         entries = self.analysis_store.list_library(user_id=user_id, limit=limit)

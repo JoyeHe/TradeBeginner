@@ -25,6 +25,9 @@ class AnalysisSession:
         self.feedback_strategy: Optional[Strategy] = None
         self.baseline_reward: Optional[RewardSignal] = None
         self.feedback_reward: Optional[RewardSignal] = None
+        self.baseline_explanation: Optional[str] = None
+        self.feedback_explanation: Optional[str] = None
+        self.comparison_narrative: Optional[str] = None
         self.feedbacks: list[AnalysisFeedback] = []
         self.status: str = "analysis_ready"
 

@@ -135,6 +135,13 @@ class AnalysisFlow:
             session.baseline_reward = await self.agent6.evaluate_strategy(strategy)
         except Exception as exc:
             logger.warning("baseline_backtest_failed", error=str(exc))
+        try:
+            session.baseline_explanation = await self.agent3.explain_strategy_and_backtest(
+                strategy, session.baseline_reward, query=query
+            )
+        except Exception as exc:
+            logger.warning("baseline_explanation_failed", error=str(exc))
+            session.baseline_explanation = strategy.rationale
         session.status = "ready"
         entry = StrategyLibraryEntry(
             user_id=user_id,
@@ -191,13 +198,40 @@ class AnalysisFlow:
 
         session.revised_analysis = revised
         session.status = "generating_strategy"
-        strategy = await self.generate_strategy_from_analysis(revised)
+        strategy = await self.agent3.generate_strategy_from_feedback(
+            baseline_analysis=session.baseline_analysis,
+            baseline_strategy=session.baseline_strategy,
+            baseline_reward=session.baseline_reward,
+            feedback_text=correction_text,
+            overall_verdict=feedback.overall_verdict,
+            preference_hints=hints,
+        )
+        strategy.analysis_id = revised.analysis_id
+        strategy.rationale = f"{revised.outlook.narrative}\n\n{strategy.rationale}"
         session.feedback_strategy = strategy
         session.status = "evaluating"
         try:
             session.feedback_reward = await self.agent6.evaluate_strategy(strategy)
         except Exception as exc:
             logger.warning("feedback_backtest_failed", error=str(exc))
+        try:
+            session.feedback_explanation = await self.agent3.explain_strategy_and_backtest(
+                strategy, session.feedback_reward, query=session.baseline_analysis.query_context
+            )
+        except Exception as exc:
+            logger.warning("feedback_explanation_failed", error=str(exc))
+            session.feedback_explanation = strategy.rationale
+        if session.baseline_strategy is not None:
+            try:
+                session.comparison_narrative = await self.agent3.compare_strategy_outcomes(
+                    session.baseline_strategy,
+                    session.baseline_reward,
+                    strategy,
+                    session.feedback_reward,
+                    feedback_text=correction_text,
+                )
+            except Exception as exc:
+                logger.warning("comparison_narrative_failed", error=str(exc))
         session.status = "ready"
 
         await self.agent5.on_analysis_feedback(session.baseline_analysis, revised, feedback)
@@ -243,6 +277,9 @@ class AnalysisFlow:
             "feedback_strategy": _dump(session.feedback_strategy),
             "baseline_reward": _dump(session.baseline_reward),
             "feedback_reward": _dump(session.feedback_reward),
+            "baseline_explanation": session.baseline_explanation,
+            "feedback_explanation": session.feedback_explanation,
+            "comparison_narrative": session.comparison_narrative,
             "feedbacks": [_dump(f) for f in session.feedbacks],
         }
 
@@ -252,23 +289,49 @@ class AnalysisFlow:
             return {"status": "not_found"}
         return self.session_to_dict(session)
 
-    def compare_session(self, analysis_id: str) -> dict:
+    async def compare_session(self, analysis_id: str) -> dict:
         session = self.store.get_session(analysis_id)
         if session is None:
             return {"status": "not_found"}
         base_r = None if session.baseline_reward is None else session.baseline_reward.terminal_reward
         fb_r = None if session.feedback_reward is None else session.feedback_reward.terminal_reward
+        if (
+            session.comparison_narrative is None
+            and session.baseline_strategy is not None
+            and session.feedback_strategy is not None
+        ):
+            fb_text = ""
+            if session.feedbacks:
+                last = session.feedbacks[-1]
+                fb_text = last.free_text or ""
+            try:
+                session.comparison_narrative = await self.agent3.compare_strategy_outcomes(
+                    session.baseline_strategy,
+                    session.baseline_reward,
+                    session.feedback_strategy,
+                    session.feedback_reward,
+                    feedback_text=fb_text,
+                )
+            except Exception as exc:
+                logger.warning("comparison_narrative_failed", error=str(exc))
         return {
             "analysis_id": analysis_id,
             "baseline": {
                 "analysis": session.baseline_analysis.model_dump(mode="json"),
+                "strategy": None if session.baseline_strategy is None else session.baseline_strategy.model_dump(mode="json"),
+                "reward": None if session.baseline_reward is None else session.baseline_reward.model_dump(mode="json"),
+                "explanation": session.baseline_explanation,
                 "strategy_id": None if session.baseline_strategy is None else session.baseline_strategy.strategy_id,
-                "reward": base_r,
+                "terminal_reward": base_r,
             },
             "revised": {
                 "analysis": None if session.revised_analysis is None else session.revised_analysis.model_dump(mode="json"),
+                "strategy": None if session.feedback_strategy is None else session.feedback_strategy.model_dump(mode="json"),
+                "reward": None if session.feedback_reward is None else session.feedback_reward.model_dump(mode="json"),
+                "explanation": session.feedback_explanation,
                 "strategy_id": None if session.feedback_strategy is None else session.feedback_strategy.strategy_id,
-                "reward": fb_r,
+                "terminal_reward": fb_r,
             },
             "reward_delta": None if base_r is None or fb_r is None else fb_r - base_r,
+            "comparison_narrative": session.comparison_narrative,
         }

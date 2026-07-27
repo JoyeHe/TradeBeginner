@@ -350,6 +350,91 @@ async def test_generate_strategy_from_feedback_includes_fusion(monkeypatch: pyte
 
 
 @pytest.mark.asyncio
+async def test_compare_strategy_outcomes(monkeypatch: pytest.MonkeyPatch):
+    """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.compare_strategy_outcomes"""
+    memory = _MemoryStub({"working_memory": {}, "recent_episodes": [], "semantic_knowledge": []})
+    agent, _ = _build_agent(monkeypatch, memory)
+    monkeypatch.setattr(
+        "agents.common.llm_chat",
+        AsyncMock(return_value="Revised cuts size and improves drawdown vs baseline."),
+    )
+    s1 = Strategy(
+        market_regime=MarketRegime.BULL,
+        positions=[
+            Position(
+                asset="AAPL",
+                action=PositionAction.LONG,
+                size_pct=10.0,
+                stop_loss_pct=3.0,
+                take_profit_pct=8.0,
+                time_horizon_days=10,
+                confidence=0.7,
+            )
+        ],
+        rationale="baseline momentum",
+        risk_metrics=RiskMetrics(total_exposure_pct=10.0),
+    )
+    r1 = RewardSignal(
+        strategy_id=s1.strategy_id,
+        terminal_reward=0.35,
+        backtest_result=BacktestResult(
+            strategy_id=s1.strategy_id,
+            backtest_start=datetime.now(timezone.utc),
+            backtest_end=datetime.now(timezone.utc),
+            total_return=0.06,
+            sharpe_ratio=0.9,
+            max_drawdown=0.08,
+            win_rate=0.55,
+            profit_factor=1.1,
+            total_trades=4,
+            avg_trade_return=0.01,
+            volatility=0.14,
+        ),
+    )
+    s2 = Strategy(
+        market_regime=MarketRegime.BULL,
+        positions=[
+            Position(
+                asset="AAPL",
+                action=PositionAction.LONG,
+                size_pct=5.0,
+                stop_loss_pct=2.5,
+                take_profit_pct=6.0,
+                time_horizon_days=10,
+                confidence=0.6,
+            )
+        ],
+        rationale="revised cautious sizing",
+        risk_metrics=RiskMetrics(total_exposure_pct=5.0),
+    )
+    r2 = RewardSignal(
+        strategy_id=s2.strategy_id,
+        terminal_reward=0.48,
+        backtest_result=BacktestResult(
+            strategy_id=s2.strategy_id,
+            backtest_start=datetime.now(timezone.utc),
+            backtest_end=datetime.now(timezone.utc),
+            total_return=0.05,
+            sharpe_ratio=1.2,
+            max_drawdown=0.04,
+            win_rate=0.62,
+            profit_factor=1.4,
+            total_trades=4,
+            avg_trade_return=0.012,
+            volatility=0.10,
+        ),
+    )
+    text = await agent.compare_strategy_outcomes(
+        baseline_strategy=s1,
+        baseline_reward=r1,
+        revised_strategy=s2,
+        revised_reward=r2,
+        feedback_text="more cautious",
+    )
+    assert len(text) > 20
+
+
+@pytest.mark.asyncio
 async def test_refine_strategy_with_feedback(monkeypatch: pytest.MonkeyPatch, base_context, valid_strategy: Strategy):
     """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.refine_strategy"""
     memory = _MemoryStub(base_context)

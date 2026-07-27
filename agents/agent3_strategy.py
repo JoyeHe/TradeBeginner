@@ -442,6 +442,42 @@ Generate one strategy as strict JSON matching this schema:
             + (f"Backtest terminal reward={reward.terminal_reward:.3f}." if reward else "No backtest.")
         )
 
+    async def compare_strategy_outcomes(
+        self,
+        baseline_strategy: Strategy,
+        baseline_reward: Optional["RewardSignal"],
+        revised_strategy: Strategy,
+        revised_reward: Optional["RewardSignal"],
+        feedback_text: str = "",
+    ) -> str:
+        """Compare baseline vs feedback-revised strategy and backtests (Analysis UI)."""
+        from agents.common import llm_chat
+
+        def pack(s: Strategy, r: Optional["RewardSignal"]) -> dict:
+            return {
+                "strategy": s.model_dump(mode="json"),
+                "reward": None if r is None else r.model_dump(mode="json"),
+            }
+
+        system_prompt = (
+            "You compare two trading strategies and their backtests. "
+            "Explain what changed after user feedback, which metrics improved/worsened, "
+            "and a clear recommendation (4-8 sentences). Do not invent numbers."
+        )
+        user_prompt = (
+            f"User feedback: {feedback_text}\n\n"
+            f"BASELINE:\n{json.dumps(pack(baseline_strategy, baseline_reward), default=str, indent=2)}\n\n"
+            f"REVISED:\n{json.dumps(pack(revised_strategy, revised_reward), default=str, indent=2)}\n\n"
+            "Write the comparison:"
+        )
+        result = await llm_chat(self.settings, system_prompt, user_prompt)
+        if result.strip():
+            return result.strip()
+        br = None if baseline_reward is None else baseline_reward.terminal_reward
+        rr = None if revised_reward is None else revised_reward.terminal_reward
+        delta = None if br is None or rr is None else rr - br
+        return f"Baseline reward={br}, revised reward={rr}, delta={delta}. Feedback: {feedback_text}"
+
     async def _log_rl_trace(self, context: dict, prompt: str, raw_response: str, strategy: Strategy, error: Optional[str] = None) -> None:
         trace_payload = {
             "trace_id": str(uuid.uuid4()),

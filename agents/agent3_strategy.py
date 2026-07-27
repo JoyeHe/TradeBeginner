@@ -19,6 +19,7 @@ from schemas.strategy import MarketRegime, Position, PositionAction, RiskMetrics
 from tools.agno_tools import StrategyAgentTools
 
 if TYPE_CHECKING:
+    from schemas.analysis import MarketAnalysis
     from schemas.rewards import RewardSignal
 
 logger = structlog.get_logger(__name__)
@@ -83,7 +84,7 @@ class Agent3Strategy:
 
     def _make_prompt(self, context: dict) -> str:
         schema_json = json.dumps(Strategy.model_json_schema(), indent=2)
-        return f"""
+        prompt = f"""
 {STRATEGY_SYSTEM_PROMPT}
 
 ## Current Market Conditions
@@ -103,11 +104,27 @@ class Agent3Strategy:
 
 ## Market Analysis (if available)
 {json.dumps(context.get("market_analysis"), default=str, indent=2)}
+"""
+        if context.get("user_feedback") or context.get("baseline_strategy"):
+            prompt += f"""
 
+## Flow1 Baseline Strategy (do not ignore)
+{json.dumps(context.get("baseline_strategy"), default=str, indent=2)}
+
+## Flow1 Backtest / Reward
+{json.dumps(context.get("baseline_reward"), default=str, indent=2)}
+
+## User Feedback (must incorporate)
+{json.dumps(context.get("user_feedback"), default=str, indent=2)}
+
+Revise the strategy to respect the user feedback while staying consistent with the baseline analysis evidence.
+"""
+        prompt += f"""
 ## Task
 Generate one strategy as strict JSON matching this schema:
 {schema_json}
 """
+        return prompt
 
     def _extract_json(self, text: str) -> str:
         try:
@@ -350,6 +367,35 @@ Generate one strategy as strict JSON matching this schema:
         )
         result = await llm_chat(self.settings, system_prompt, user_prompt)
         return result if result.strip() else strategy.rationale
+
+    async def generate_strategy_from_feedback(
+        self,
+        baseline_analysis: "MarketAnalysis",
+        baseline_strategy: Strategy,
+        baseline_reward: Optional["RewardSignal"],
+        feedback_text: str,
+        overall_verdict: str = "partial",
+        preference_hints: Optional[list[dict]] = None,
+    ) -> Strategy:
+        """Fuse Flow1 analysis + Flow1 strategy/reward + user feedback → new Strategy."""
+        context = await self.gather_context()
+        context["market_analysis"] = baseline_analysis.model_dump(mode="json")
+        context["user_request"] = baseline_analysis.query_context
+        context["baseline_strategy"] = baseline_strategy.model_dump(mode="json")
+        context["baseline_reward"] = None if baseline_reward is None else baseline_reward.model_dump(mode="json")
+        context["user_feedback"] = {
+            "overall_verdict": overall_verdict,
+            "correction": feedback_text,
+            "preference_hints": preference_hints or [],
+        }
+        strategy = await self.generate_strategy(context)
+        strategy.analysis_id = baseline_analysis.analysis_id
+        strategy.metadata["origin"] = "post_feedback"
+        strategy.metadata["parent_strategy_id"] = baseline_strategy.strategy_id
+        strategy.data_sources_used = list(
+            set(strategy.data_sources_used + ["market_analysis", "user_feedback", "baseline_strategy"])
+        )
+        return strategy
 
     async def explain_strategy_and_backtest(
         self,

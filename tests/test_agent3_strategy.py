@@ -291,6 +291,65 @@ async def test_explain_strategy_and_backtest(monkeypatch: pytest.MonkeyPatch):
 
 
 @pytest.mark.asyncio
+async def test_generate_strategy_from_feedback_includes_fusion(monkeypatch: pytest.MonkeyPatch):
+    """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.generate_strategy_from_feedback"""
+    memory = _MemoryStub({"working_memory": {}, "recent_episodes": [], "semantic_knowledge": []})
+    agent, _ = _build_agent(monkeypatch, memory)
+    captured: dict = {}
+
+    async def fake_generate(context):
+        captured["context"] = context
+        return Strategy(
+            market_regime=MarketRegime.BULL,
+            positions=[
+                Position(
+                    asset="AAPL",
+                    action=PositionAction.LONG,
+                    size_pct=5.0,
+                    stop_loss_pct=3.0,
+                    take_profit_pct=6.0,
+                    time_horizon_days=7,
+                    confidence=0.6,
+                )
+            ],
+            rationale="revised after feedback",
+            risk_metrics=RiskMetrics(total_exposure_pct=5.0),
+        )
+
+    monkeypatch.setattr(agent, "generate_strategy", fake_generate)
+    from schemas.analysis import FlowType, MarketAnalysis, MarketOutlook, OutlookDirection, SentimentView
+
+    analysis = MarketAnalysis(
+        user_id="u",
+        query_context="AAPL outlook",
+        flow_type=FlowType.BASELINE,
+        sentiment=SentimentView(overall_score=0.2, key_themes=["earnings"]),
+        outlook=MarketOutlook(
+            direction=OutlookDirection.NEUTRAL,
+            horizon_days=14,
+            confidence=0.5,
+            affected_assets=["AAPL"],
+            narrative="Neutral near-term",
+        ),
+        news_bundle={},
+        market_evidence={},
+    )
+    baseline = await fake_generate({})
+    out = await agent.generate_strategy_from_feedback(
+        baseline_analysis=analysis,
+        baseline_strategy=baseline,
+        baseline_reward=None,
+        feedback_text="Make outlook more cautious; cut size",
+        overall_verdict="partial",
+        preference_hints=[{"prior_feedback": "prefer lower size"}],
+    )
+    assert out.positions
+    ctx = captured["context"]
+    assert "feedback" in ctx or "user_feedback" in ctx
+    assert "baseline_strategy" in ctx or "prior_strategy" in ctx
+
+
+@pytest.mark.asyncio
 async def test_refine_strategy_with_feedback(monkeypatch: pytest.MonkeyPatch, base_context, valid_strategy: Strategy):
     """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.refine_strategy"""
     memory = _MemoryStub(base_context)

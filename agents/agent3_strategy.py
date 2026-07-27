@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import uuid
 
 import structlog
@@ -17,6 +17,9 @@ from config.settings import Settings
 from memory import MemoryManager
 from schemas.strategy import MarketRegime, Position, PositionAction, RiskMetrics, Strategy
 from tools.agno_tools import StrategyAgentTools
+
+if TYPE_CHECKING:
+    from schemas.rewards import RewardSignal
 
 logger = structlog.get_logger(__name__)
 
@@ -347,6 +350,51 @@ Generate one strategy as strict JSON matching this schema:
         )
         result = await llm_chat(self.settings, system_prompt, user_prompt)
         return result if result.strip() else strategy.rationale
+
+    async def explain_strategy_and_backtest(
+        self,
+        strategy: Strategy,
+        reward: Optional[RewardSignal] = None,
+        query: Optional[str] = None,
+    ) -> str:
+        """Natural-language explanation of strategy + quantitative backtest (Analysis UI)."""
+        from agents.common import llm_chat
+
+        positions_desc = "\n".join(
+            f"- {p.action.value.upper()} {p.asset}: {p.size_pct}%, SL {p.stop_loss_pct}%, "
+            f"TP {p.take_profit_pct}, {p.time_horizon_days}d, conf {p.confidence:.0%}"
+            for p in strategy.positions
+        )
+        bt_block = "Backtest: unavailable"
+        if reward is not None and reward.backtest_result is not None:
+            bt = reward.backtest_result
+            bt_block = (
+                f"Terminal reward: {reward.terminal_reward:.4f}\n"
+                f"Total return: {bt.total_return:.2%}, Sharpe: {bt.sharpe_ratio}, "
+                f"Max DD: {bt.max_drawdown:.2%}, Win rate: {bt.win_rate:.2%}, "
+                f"Trades: {bt.total_trades}, Volatility: {bt.volatility:.2%}"
+            )
+        system_prompt = (
+            "You are a trading desk analyst. Explain the strategy AND its backtest results "
+            "in clear Chinese or English matching the query language (4-8 sentences). "
+            "Cover thesis, positions, risk, and what the backtest numbers imply. "
+            "Do not invent metrics not provided."
+        )
+        user_prompt = (
+            f"Query: {query or '(none)'}\n"
+            f"Regime: {strategy.market_regime.value}\n"
+            f"Rationale: {strategy.rationale}\n"
+            f"Positions:\n{positions_desc}\n"
+            f"Exposure: {strategy.risk_metrics.total_exposure_pct}%\n"
+            f"{bt_block}\n\nWrite the explanation:"
+        )
+        result = await llm_chat(self.settings, system_prompt, user_prompt)
+        if result.strip():
+            return result.strip()
+        return (
+            f"Strategy on {strategy.market_regime.value}: {strategy.rationale[:240]}. "
+            + (f"Backtest terminal reward={reward.terminal_reward:.3f}." if reward else "No backtest.")
+        )
 
     async def _log_rl_trace(self, context: dict, prompt: str, raw_response: str, strategy: Strategy, error: Optional[str] = None) -> None:
         trace_payload = {

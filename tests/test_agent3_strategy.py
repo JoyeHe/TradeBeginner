@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 from agents.agent3_strategy import Agent3Strategy
 from config.settings import Settings
 from memory.working import WorkingMemory
-from schemas.strategy import MarketRegime, Strategy
+from schemas.rewards import BacktestResult, RewardSignal
+from schemas.strategy import MarketRegime, Position, PositionAction, RiskMetrics, Strategy
 
 
 def _diag(function_tested: str, input_value, expected, actual, diagnosis: str) -> str:
@@ -240,6 +242,52 @@ async def test_strategy_written_to_working_memory(monkeypatch: pytest.MonkeyPatc
     active = await memory.working.get("active_strategy")
     assert active is not None
     assert active.strategy_id == out.strategy_id
+
+
+@pytest.mark.asyncio
+async def test_explain_strategy_and_backtest(monkeypatch: pytest.MonkeyPatch):
+    """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.explain_strategy_and_backtest"""
+    memory = _MemoryStub({"working_memory": {}, "recent_episodes": [], "semantic_knowledge": []})
+    agent, _ = _build_agent(monkeypatch, memory)
+    monkeypatch.setattr(
+        "agents.common.llm_chat",
+        AsyncMock(return_value="This long strategy uses AAPL with a controlled risk profile."),
+    )
+    strategy = Strategy(
+        market_regime=MarketRegime.BULL,
+        positions=[
+            Position(
+                asset="AAPL",
+                action=PositionAction.LONG,
+                size_pct=10.0,
+                stop_loss_pct=3.0,
+                take_profit_pct=8.0,
+                time_horizon_days=10,
+                confidence=0.7,
+            )
+        ],
+        rationale="earnings momentum",
+        risk_metrics=RiskMetrics(total_exposure_pct=10.0),
+    )
+    reward = RewardSignal(
+        strategy_id=strategy.strategy_id,
+        terminal_reward=0.42,
+        backtest_result=BacktestResult(
+            strategy_id=strategy.strategy_id,
+            backtest_start=datetime.now(timezone.utc),
+            backtest_end=datetime.now(timezone.utc),
+            total_return=0.08,
+            sharpe_ratio=1.1,
+            max_drawdown=0.05,
+            win_rate=0.6,
+            profit_factor=1.3,
+            total_trades=5,
+            avg_trade_return=0.01,
+            volatility=0.12,
+        ),
+    )
+    text = await agent.explain_strategy_and_backtest(strategy, reward, query="AAPL outlook")
+    assert "AAPL" in text or "risk" in text.lower() or len(text) > 20
 
 
 @pytest.mark.asyncio

@@ -58,7 +58,7 @@ class E2EReport:
 
 
 def _switch_tab(page: Page, tab: str) -> None:
-    page.locator(f'nav.tabs button[data-tab="{tab}"]').click()
+    page.locator(f'nav.nav-tabs button[data-tab="{tab}"]').click()
     expect(page.locator(f"#tab-{tab}")).to_have_class(re.compile(r"\bactive\b"))
 
 
@@ -88,7 +88,7 @@ def run_frontend_e2e() -> E2EReport:
         page.goto(BASE, wait_until="networkidle", timeout=60_000)
 
         # ── Initial load UX ──
-        title = page.locator("header h1").inner_text()
+        title = page.locator(".brand h1").inner_text()
         report.add("Page title", title == "TradeBeginner", title)
 
         status_pill = page.locator("#statusPill").inner_text()
@@ -106,7 +106,7 @@ def run_frontend_e2e() -> E2EReport:
         # ── Tab routing ──
         for tab in TABS:
             _switch_tab(page, tab)
-            active_btn = page.locator("nav.tabs button.active").get_attribute("data-tab")
+            active_btn = page.locator("nav.nav-tabs button.active").get_attribute("data-tab")
             panel_visible = page.locator(f"#tab-{tab}").is_visible()
             others_hidden = all(
                 not page.locator(f"#tab-{other}").evaluate("el => el.classList.contains('active')")
@@ -116,12 +116,11 @@ def run_frontend_e2e() -> E2EReport:
 
         # Default tab should be news
         _switch_tab(page, "news")
-        report.add("Default tab is News", page.locator('nav.tabs button[data-tab="news"]').evaluate("el => el.classList.contains('active')"), "news")
+        report.add("Default tab is News", page.locator('nav.nav-tabs button[data-tab="news"]').evaluate("el => el.classList.contains('active')"), "news")
 
-        # No URL hash routing (UX note)
-        page.locator('nav.tabs button[data-tab="market"]').click()
-        hash_empty = page.evaluate("() => !window.location.hash || window.location.hash === ''")
-        report.add("URL hash routing", False, "Tabs do not update location.hash — no deep links / back-button support", severity="warn")
+        page.locator('nav.nav-tabs button[data-tab="market"]').click()
+        hash_ok = page.evaluate("() => window.location.hash === '#market'")
+        report.add("URL hash routing", hash_ok, f"hash={page.evaluate('() => window.location.hash')}")
 
         # ── News tab UX + API ──
         _switch_tab(page, "news")
@@ -133,7 +132,7 @@ def run_frontend_e2e() -> E2EReport:
         report.add("News search UX: AI summary", has_summary, summary[:120] if summary else "empty")
 
         kpi = page.locator("#newsKpi").inner_text()
-        report.add("News search UX: KPI row", "Total:" in kpi, kpi[:100])
+        report.add("News search UX: stat cards", "Total" in kpi, kpi[:100])
 
         tr_count = page.locator("#trCount").inner_text()
         report.add("News search UX: TrendRadar count pill", tr_count.isdigit(), f"count={tr_count}")
@@ -170,6 +169,13 @@ def run_frontend_e2e() -> E2EReport:
         baseline_summary = page.locator("#baselineSummary").inner_text()
         report.add("Analysis baseline UX: summary text", len(baseline_summary) > 20 and "Run baseline" not in baseline_summary, baseline_summary[:100])
 
+        baseline_nl = page.locator("#baselineStrategySummary").inner_text()
+        report.add(
+            "Analysis baseline NL",
+            len(baseline_nl) > 30 and "Run baseline" not in baseline_nl,
+            baseline_nl[:80],
+        )
+
         baseline_json = page.locator("#baselineAnalysis").inner_text()
         report.add("Analysis baseline: JSON panel", "outlook" in baseline_json or "sentiment" in baseline_json, "schema fields present" if "outlook" in baseline_json else baseline_json[:80])
 
@@ -181,6 +187,20 @@ def run_frontend_e2e() -> E2EReport:
 
         revised_summary = page.locator("#revisedSummary").inner_text()
         report.add("Analysis feedback UX: revised summary", "Feedback failed" not in revised_summary and len(revised_summary) > 10, revised_summary[:100])
+
+        feedback_nl = page.locator("#feedbackStrategySummary").inner_text()
+        report.add(
+            "Analysis feedback NL",
+            len(feedback_nl) > 30 and "Submit feedback" not in feedback_nl,
+            feedback_nl[:80],
+        )
+
+        compare_nl = page.locator("#compareNarrative").inner_text()
+        report.add(
+            "Analysis compare narrative",
+            len(compare_nl) > 20 and compare_nl != "No comparison yet.",
+            compare_nl[:80],
+        )
 
         page.locator("#btnCompareAnalysis").click()
         page.wait_for_timeout(1500)

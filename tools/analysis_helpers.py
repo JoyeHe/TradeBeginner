@@ -72,6 +72,10 @@ def build_market_evidence_from_lookup(market_data: dict) -> dict:
                 "close": bar.get("close"),
                 "rsi_14": ind.get("rsi_14"),
                 "sma_20": ind.get("sma_20"),
+                "sma_50": ind.get("sma_50"),
+                "sma_200": ind.get("sma_200"),
+                "momentum_roc_10": ind.get("momentum_roc_10"),
+                "momentum_roc_20": ind.get("momentum_roc_20"),
                 "macd": ind.get("macd"),
                 "adx": ind.get("adx"),
                 "volume": bar.get("volume"),
@@ -92,6 +96,12 @@ def build_market_evidence_from_snapshot(snapshot) -> dict:
         tickers[tk] = {
             "close": bar.get("close") if isinstance(bar, dict) else getattr(bar, "close", None),
             "rsi_14": ind.get("rsi_14") if isinstance(ind, dict) else getattr(ind, "rsi_14", None),
+            "sma_20": ind.get("sma_20") if isinstance(ind, dict) else getattr(ind, "sma_20", None),
+            "sma_50": ind.get("sma_50") if isinstance(ind, dict) else getattr(ind, "sma_50", None),
+            "sma_200": ind.get("sma_200") if isinstance(ind, dict) else getattr(ind, "sma_200", None),
+            "momentum_roc_10": ind.get("momentum_roc_10") if isinstance(ind, dict) else getattr(ind, "momentum_roc_10", None),
+            "momentum_roc_20": ind.get("momentum_roc_20") if isinstance(ind, dict) else getattr(ind, "momentum_roc_20", None),
+            "macd": ind.get("macd") if isinstance(ind, dict) else getattr(ind, "macd", None),
             "volume": bar.get("volume") if isinstance(bar, dict) else getattr(bar, "volume", None),
         }
     return {"tickers": tickers, "regime": regime, "vix": dumped.get("vix")}

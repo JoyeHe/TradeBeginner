@@ -3,116 +3,315 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TradeBeginner Dashboard</title>
+  <meta name="theme-color" content="#0a0a12" />
+  <title>TradeBeginner — AI Trading Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    :root{color-scheme:dark;--bg:#0f172a;--panel:#111827;--muted:#334155;--text:#e5e7eb;--sub:#94a3b8;--ok:#10b981;--warn:#f59e0b;--bad:#ef4444;--accent:#3b82f6;--tab-active:#1e3a5f}
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.45}
-    .wrap{max-width:1260px;margin:0 auto;padding:16px}
-    header{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--muted);margin-bottom:14px}
-    header h1{font-size:20px;font-weight:700}
-    .pill{display:inline-block;border-radius:999px;padding:3px 10px;font-size:12px;border:1px solid var(--muted);color:var(--sub)}
-    .tabs{display:flex;gap:4px;margin-bottom:14px}
-    .tabs button{background:var(--panel);border:1px solid var(--muted);color:var(--sub);border-radius:8px 8px 0 0;padding:10px 18px;cursor:pointer;font-size:14px;font-weight:500;transition:background .15s}
-    .tabs button.active{background:var(--tab-active);color:var(--text);border-bottom-color:var(--tab-active)}
-    .tab-panel{display:none}
-    .tab-panel.active{display:block}
-    .row{display:grid;gap:14px;grid-template-columns:1fr 1fr}
-    @media(max-width:860px){.row{grid-template-columns:1fr}}
-    .card{background:var(--panel);border:1px solid var(--muted);border-radius:12px;padding:16px;margin-bottom:14px}
-    .card .t{font-size:15px;font-weight:600;margin-bottom:8px}
-    .card .sub{color:var(--sub);font-size:13px;margin-bottom:8px}
-    textarea,input[type=text]{width:100%;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);padding:10px;font-size:14px;resize:vertical}
-    textarea{min-height:70px}
-    button{border-radius:8px;border:1px solid var(--muted);color:var(--text);padding:10px 14px;font-size:14px;cursor:pointer;background:var(--panel)}
-    .btn-primary{background:var(--accent);border-color:#2563eb}
-    .btn-ok{background:#064e3b;border-color:#065f46}
-    .btn-warn{background:#78350f;border-color:#92400e}
-    .btn-bad{background:#7f1d1d;border-color:#991b1b}
-    .btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
-    pre{margin:0;white-space:pre-wrap;word-wrap:break-word;background:#0b1220;border:1px solid var(--muted);border-radius:8px;padding:10px;font-size:12px;max-height:400px;overflow:auto;margin-top:8px}
-    .kpi{display:flex;gap:16px;flex-wrap:wrap;font-size:14px;margin-top:6px}
-    .kpi span{color:var(--sub)}
-    .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:6px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    .hide{display:none}
-    .news-list{max-height:500px;overflow:auto}
-    .news-item{display:block;padding:10px 12px;margin:4px 0;border:1px solid var(--muted);border-radius:8px;background:#0b1220;color:var(--text);text-decoration:none;transition:border-color .15s}
-    .news-item:hover{border-color:var(--accent)}
-    .news-item .ni-title{font-size:14px;font-weight:500;margin-bottom:4px;color:var(--text)}
-    .news-item .ni-meta{font-size:12px;color:var(--sub)}
-    .news-item .ni-sentiment{display:inline-block;padding:1px 6px;border-radius:4px;font-size:11px;margin-left:6px}
-    .ni-pos{background:#064e3b;color:#6ee7b7}
-    .ni-neg{background:#7f1d1d;color:#fca5a5}
-    .ni-neu{background:#1e293b;color:#94a3b8}
-    .bars-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
-    .bars-table th,.bars-table td{padding:4px 8px;border-bottom:1px solid var(--muted);text-align:right}
-    .bars-table th{color:var(--sub);font-weight:500;position:sticky;top:0;background:var(--panel)}
+    :root {
+      color-scheme: dark;
+      --primary: #7c3aed;
+      --secondary: #6366f1;
+      --accent: #ec4899;
+      --bg: #0a0a12;
+      --bg-glow: radial-gradient(ellipse 80% 50% at 50% -20%, rgba(124, 58, 237, 0.18), transparent);
+      --panel: rgba(22, 27, 45, 0.78);
+      --panel-solid: #111827;
+      --surface: rgba(11, 15, 28, 0.92);
+      --border: rgba(148, 163, 184, 0.14);
+      --border-focus: rgba(124, 58, 237, 0.55);
+      --text: #f1f5f9;
+      --sub: #94a3b8;
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --bad: #ef4444;
+      --radius: 10px;
+      --radius-lg: 14px;
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+      --transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Inter, system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      background: var(--bg);
+      background-image: var(--bg-glow);
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .app { max-width: 1280px; margin: 0 auto; padding: 0 16px 32px; }
+    .topbar {
+      position: sticky; top: 0; z-index: 50;
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      background: rgba(10, 10, 18, 0.82);
+      border-bottom: 1px solid var(--border);
+      margin: 0 -16px 16px; padding: 12px 16px;
+    }
+    .topbar-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .brand { display: flex; align-items: center; gap: 10px; }
+    .brand-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: grid; place-items: center; box-shadow: 0 0 20px rgba(124, 58, 237, 0.35);
+    }
+    .brand-icon svg { width: 20px; height: 20px; stroke: #fff; fill: none; stroke-width: 2; }
+    .brand h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+    .brand .tagline { font-size: 12px; color: var(--sub); font-weight: 400; }
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 500;
+      border: 1px solid var(--border); background: var(--surface); color: var(--sub);
+    }
+    .pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--sub); }
+    .pill.ok { border-color: rgba(16, 185, 129, 0.35); color: #6ee7b7; }
+    .pill.ok .dot { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+    .pill.warn { border-color: rgba(245, 158, 11, 0.35); color: #fcd34d; }
+    .pill.warn .dot { background: var(--warn); }
+    .pill.mode { border-color: rgba(99, 102, 241, 0.35); color: #a5b4fc; }
+
+    .nav-tabs {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
+      scrollbar-width: none; -ms-overflow-style: none;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+    .nav-tabs button {
+      display: inline-flex; align-items: center; gap: 8px;
+      flex-shrink: 0; border: 1px solid var(--border); border-radius: var(--radius);
+      background: var(--surface); color: var(--sub);
+      padding: 10px 14px; font-size: 13px; font-weight: 500;
+      cursor: pointer; transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
+    }
+    .nav-tabs button:hover { color: var(--text); border-color: rgba(124, 58, 237, 0.35); background: rgba(124, 58, 237, 0.08); }
+    .nav-tabs button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+    .nav-tabs button.active {
+      color: #fff; border-color: rgba(124, 58, 237, 0.5);
+      background: linear-gradient(135deg, rgba(124, 58, 237, 0.35), rgba(99, 102, 241, 0.2));
+      box-shadow: 0 0 16px rgba(124, 58, 237, 0.2);
+    }
+    .nav-tabs button svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; opacity: 0.85; }
+
+    .tab-panel { display: none; animation: fadeIn 0.2s ease; }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .grid-2 { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+    .grid-3 { display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
+    @media (max-width: 640px) { .grid-3 { grid-template-columns: 1fr; } }
+
+    .card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 16px; margin-bottom: 14px;
+      box-shadow: var(--shadow);
+    }
+    .card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .card .t { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+    .card .sub { color: var(--sub); font-size: 13px; margin-top: 4px; line-height: 1.45; }
+    .card-badge { font-size: 11px; padding: 2px 8px; border-radius: 999px; background: rgba(124, 58, 237, 0.15); color: #c4b5fd; border: 1px solid rgba(124, 58, 237, 0.25); }
+
+    .field { margin-top: 10px; }
+    .field label { display: block; font-size: 12px; color: var(--sub); margin-bottom: 6px; font-weight: 500; }
+    input[type=text], input[type=date], textarea, select {
+      width: 100%; border-radius: var(--radius); border: 1px solid var(--border);
+      background: var(--surface); color: var(--text); padding: 10px 12px;
+      font-size: 14px; font-family: inherit; transition: border-color var(--transition), box-shadow var(--transition);
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    input:focus-visible, textarea:focus-visible, select:focus-visible {
+      outline: none; border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.18);
+    }
+
+    button.btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      border-radius: var(--radius); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 14px; font-size: 13px; font-weight: 500;
+      cursor: pointer; background: var(--surface); font-family: inherit;
+      transition: background var(--transition), border-color var(--transition), transform var(--transition);
+      min-height: 40px;
+    }
+    button.btn:hover { border-color: rgba(148, 163, 184, 0.35); background: rgba(255,255,255,0.04); }
+    button.btn:active { transform: scale(0.98); }
+    button.btn:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+    .btn-primary { background: linear-gradient(135deg, var(--primary), var(--secondary)); border-color: transparent; color: #fff; }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-ok { background: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.35); color: #6ee7b7; }
+    .btn-warn { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.35); color: #fcd34d; }
+    .btn-bad { background: rgba(239, 68, 68, 0.12); border-color: rgba(239, 68, 68, 0.35); color: #fca5a5; }
+    .btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+    .stat-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .stat {
+      flex: 1; min-width: 120px; padding: 10px 12px; border-radius: var(--radius);
+      background: var(--surface); border: 1px solid var(--border);
+    }
+    .stat .label { font-size: 11px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat .value { font-size: 18px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .stat.pos .value { color: #6ee7b7; }
+    .stat.neg .value { color: #fca5a5; }
+
+    pre.code {
+      margin: 0; white-space: pre-wrap; word-wrap: break-word;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px; font-size: 12px;
+      max-height: 400px; overflow: auto; margin-top: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .prose { font-size: 14px; line-height: 1.65; min-height: 40px; color: var(--text); }
+    .prose.muted { color: var(--sub); }
+    code.id-chip {
+      font-family: ui-monospace, monospace; font-size: 12px;
+      padding: 2px 8px; border-radius: 6px;
+      background: rgba(124, 58, 237, 0.12); border: 1px solid rgba(124, 58, 237, 0.25); color: #c4b5fd;
+    }
+
+    .spinner {
+      display: inline-block; width: 14px; height: 14px;
+      border: 2px solid rgba(255,255,255,0.2); border-top-color: #fff;
+      border-radius: 50%; animation: spin 0.6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .hide { display: none !important; }
+
+    .news-list { max-height: 420px; overflow: auto; margin-top: 8px; }
+    .news-item {
+      display: block; padding: 12px; margin: 6px 0; border: 1px solid var(--border);
+      border-radius: var(--radius); background: var(--surface); color: var(--text);
+      text-decoration: none; transition: border-color var(--transition), background var(--transition);
+    }
+    .news-item:hover { border-color: rgba(124, 58, 237, 0.4); background: rgba(124, 58, 237, 0.06); }
+    .news-item .ni-title { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+    .news-item .ni-meta { font-size: 12px; color: var(--sub); }
+    .ni-sentiment { display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 11px; font-weight: 600; margin-left: 6px; }
+    .ni-pos { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; }
+    .ni-neg { background: rgba(239, 68, 68, 0.15); color: #fca5a5; }
+    .ni-neu { background: rgba(148, 163, 184, 0.12); color: var(--sub); }
+
+    .bars-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+    .bars-table th, .bars-table td { padding: 6px 10px; border-bottom: 1px solid var(--border); text-align: right; }
+    .bars-table th { color: var(--sub); font-weight: 500; position: sticky; top: 0; background: var(--panel-solid); }
+    .bars-table td:first-child, .bars-table th:first-child { text-align: left; }
+
+    .collapse-toggle {
+      all: unset; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      font-size: 15px; font-weight: 600; width: 100%;
+    }
+    .collapse-toggle:focus-visible { outline: 2px solid var(--border-focus); border-radius: 6px; }
+    .collapse-toggle svg { width: 14px; height: 14px; stroke: var(--sub); transition: transform var(--transition); }
+    .collapse-toggle[aria-expanded="true"] svg { transform: rotate(90deg); }
+
+    .empty { color: var(--sub); padding: 16px; text-align: center; font-size: 13px; border: 1px dashed var(--border); border-radius: var(--radius); margin-top: 8px; }
   </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <h1>TradeBeginner</h1>
-    <div>
-      <span class="pill" id="modePill">Paper Trading</span>
-      <span class="pill" id="statusPill">--</span>
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        </div>
+        <div>
+          <h1>TradeBeginner</h1>
+          <div class="tagline">Multi-agent AI trading dashboard</div>
+        </div>
+      </div>
+      <div class="badges">
+        <span class="pill mode" id="modePill"><span class="dot"></span>Paper Trading</span>
+        <span class="pill" id="statusPill"><span class="dot"></span>Loading…</span>
+      </div>
     </div>
+    <nav class="nav-tabs" role="tablist" aria-label="Dashboard sections" style="margin-top:12px">
+      <button class="active" role="tab" aria-selected="true" data-tab="news" id="tabbtn-news">
+        <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        News
+      </button>
+      <button role="tab" aria-selected="false" data-tab="market" id="tabbtn-market">
+        <svg viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        Market
+      </button>
+      <button role="tab" aria-selected="false" data-tab="analysis" id="tabbtn-analysis">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+        Analysis
+      </button>
+      <button role="tab" aria-selected="false" data-tab="strategy" id="tabbtn-strategy">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+        Strategy
+      </button>
+      <button role="tab" aria-selected="false" data-tab="system" id="tabbtn-system">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        System
+      </button>
+    </nav>
   </header>
 
-  <nav class="tabs">
-    <button class="active" data-tab="news">News Search</button>
-    <button data-tab="market">Market Data</button>
-    <button data-tab="analysis">Analysis</button>
-    <button data-tab="strategy">Strategy</button>
-    <button data-tab="system">System</button>
-  </nav>
-
-  <!-- ───────────── TAB 1: News Search ───────────── -->
-  <div id="tab-news" class="tab-panel active">
+  <!-- News -->
+  <section id="tab-news" class="tab-panel active" role="tabpanel" aria-labelledby="tabbtn-news">
     <div class="card">
-      <div class="t">Search News &amp; Sentiment</div>
-      <div class="sub">Natural-language search. TrendRadar (hot rankings + RSS) is queried first; Finnhub/NewsAPI as secondary sources.</div>
-      <input type="text" id="newsQuery" placeholder='e.g. "the stock price of AAPL" or "Fed interest rate decision"' />
+      <div class="card-head">
+        <div>
+          <div class="t">Search News &amp; Sentiment</div>
+          <div class="sub">TrendRadar hot rankings + RSS first; Finnhub / NewsAPI as secondary sources.</div>
+        </div>
+        <span class="card-badge">Agent 1</span>
+      </div>
+      <div class="field">
+        <label for="newsQuery">Query</label>
+        <input type="text" id="newsQuery" placeholder='e.g. "AAPL earnings" or "Fed rate decision"' />
+      </div>
       <div class="btns">
-        <button class="btn-primary" id="btnNewsSearch">Search<span class="spinner hide" id="newsSpinner"></span></button>
+        <button class="btn btn-primary" id="btnNewsSearch">Search<span class="spinner hide" id="newsSpinner"></span></button>
       </div>
     </div>
     <div class="card">
       <div class="t">AI Summary</div>
-      <div id="newsSummary" style="font-size:14px;color:var(--text);line-height:1.6;min-height:40px">Search results will appear here with an AI-generated interpretation.</div>
-      <div class="kpi" id="newsKpi" style="margin-top:8px"></div>
+      <div id="newsSummary" class="prose muted">Search results will appear here with an AI-generated interpretation.</div>
+      <div class="stat-row" id="newsKpi"></div>
     </div>
-    <div class="row">
+    <div class="grid-2">
       <div class="card">
-        <div class="t" style="cursor:pointer" onclick="this.parentElement.querySelector('.news-list').classList.toggle('hide')">▸ TrendRadar Results <span id="trCount" class="pill">0</span></div>
-        <div id="trResults" class="news-list">No TrendRadar results yet.</div>
+        <button type="button" class="collapse-toggle" aria-expanded="true" data-target="trResults">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          TrendRadar <span class="pill" id="trCount" style="margin-left:auto">0</span>
+        </button>
+        <div id="trResults" class="news-list"><div class="empty">No TrendRadar results yet.</div></div>
       </div>
       <div class="card">
-        <div class="t" style="cursor:pointer" onclick="this.parentElement.querySelector('.news-list').classList.toggle('hide')">▸ Finnhub / NewsAPI Results <span id="apiCount" class="pill">0</span></div>
-        <div id="apiResults" class="news-list">No API results yet.</div>
+        <button type="button" class="collapse-toggle" aria-expanded="true" data-target="apiResults">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+          Finnhub / NewsAPI <span class="pill" id="apiCount" style="margin-left:auto">0</span>
+        </button>
+        <div id="apiResults" class="news-list"><div class="empty">No API results yet.</div></div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ───────────── TAB 2: Market Data ───────────── -->
-  <div id="tab-market" class="tab-panel">
+  <!-- Market -->
+  <section id="tab-market" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-market" hidden>
     <div class="card">
-      <div class="t">Financial Data Tracker</div>
-      <div class="sub">Look up price data and technical indicators. Adjust the date window and data interval below.</div>
-      <input type="text" id="marketQuery" placeholder='e.g. "BTC" or "AAPL MSFT"' />
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:8px">
+      <div class="card-head">
         <div>
-          <label class="sub" for="mktDateFrom">Date From</label>
-          <input type="date" id="mktDateFrom" />
+          <div class="t">Financial Data Tracker</div>
+          <div class="sub">OpenBB-powered OHLCV + technical indicators. Adjust date window and interval.</div>
         </div>
-        <div>
-          <label class="sub" for="mktDateTo">Date To</label>
-          <input type="date" id="mktDateTo" />
-        </div>
-        <div>
-          <label class="sub" for="mktInterval">Interval</label>
-          <select id="mktInterval" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);font-size:14px">
+        <span class="card-badge">Agent 2</span>
+      </div>
+      <div class="field">
+        <label for="marketQuery">Symbols</label>
+        <input type="text" id="marketQuery" placeholder='e.g. "AAPL" or "AAPL MSFT"' />
+      </div>
+      <div class="grid-3" style="margin-top:10px">
+        <div class="field"><label for="mktDateFrom">From</label><input type="date" id="mktDateFrom" /></div>
+        <div class="field"><label for="mktDateTo">To</label><input type="date" id="mktDateTo" /></div>
+        <div class="field">
+          <label for="mktInterval">Interval</label>
+          <select id="mktInterval">
             <option value="1d" selected>1 Day</option>
             <option value="1h">1 Hour</option>
             <option value="30m">30 Min</option>
@@ -126,59 +325,70 @@
         </div>
       </div>
       <div class="btns">
-        <button class="btn-primary" id="btnMarketSearch">Lookup<span class="spinner hide" id="marketSpinner"></span></button>
+        <button class="btn btn-primary" id="btnMarketSearch">Lookup<span class="spinner hide" id="marketSpinner"></span></button>
       </div>
     </div>
     <div class="card">
       <div class="t">Indicators</div>
-      <div class="kpi" id="marketKpi" style="margin-bottom:6px"></div>
-      <pre id="marketIndicators">No lookup yet.</pre>
+      <div class="stat-row" id="marketKpi"></div>
+      <pre class="code" id="marketIndicators">No lookup yet.</pre>
     </div>
     <div class="card">
       <div class="t">OHLCV Bars</div>
-      <div id="marketBarsContainer" style="max-height:400px;overflow:auto">No data yet.</div>
+      <div id="marketBarsContainer" style="max-height:420px;overflow:auto"><div class="empty">No data yet.</div></div>
     </div>
-  </div>
+  </section>
 
-  <!-- ───────────── TAB 3: Analysis Flow ───────────── -->
-  <div id="tab-analysis" class="tab-panel">
+  <!-- Analysis -->
+  <section id="tab-analysis" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-analysis" hidden>
     <div class="card">
-      <div class="t">Flow 1 — Baseline Analysis</div>
-      <div class="sub">News + market evidence → structured analysis → strategy → backtest. Flow 2 lets you correct the analysis and compare outcomes.</div>
-      <input type="text" id="analysisQuery" placeholder='e.g. "AAPL earnings outlook" or "Fed rate impact on tech"' />
-      <input type="text" id="analysisTickers" placeholder="Optional tickers (space-separated): AAPL MSFT" style="margin-top:8px" />
+      <div class="card-head">
+        <div>
+          <div class="t">Flow 1 — Baseline Analysis</div>
+          <div class="sub">News + market → structured analysis → strategy → backtest. Flow 2 adds your corrections.</div>
+        </div>
+        <span class="card-badge">Flow 1</span>
+      </div>
+      <div class="field"><label for="analysisQuery">Analysis query</label><input type="text" id="analysisQuery" placeholder='e.g. "AAPL earnings outlook"' /></div>
+      <div class="field"><label for="analysisTickers">Tickers (optional)</label><input type="text" id="analysisTickers" placeholder="AAPL MSFT" /></div>
       <div class="btns">
-        <button class="btn-primary" id="btnRunBaseline">Run Baseline<span class="spinner hide" id="analysisSpinner"></span></button>
-        <button id="btnRefreshLibrary">Strategy Library</button>
-        <button id="btnRefreshPrefs">Preferences</button>
+        <button class="btn btn-primary" id="btnRunBaseline">Run Baseline<span class="spinner hide" id="analysisSpinner"></span></button>
+        <button class="btn" id="btnRefreshLibrary">Strategy Library</button>
+        <button class="btn" id="btnRefreshPrefs">Preferences</button>
       </div>
     </div>
-    <div class="row">
+    <div class="grid-2">
       <div class="card">
         <div class="t">Baseline Analysis</div>
-        <div id="baselineSummary" style="font-size:14px;line-height:1.6;min-height:40px;color:var(--sub)">Run baseline to see analysis.</div>
-        <pre id="baselineAnalysis">No analysis yet.</pre>
+        <div id="baselineSummary" class="prose muted">Run baseline to see analysis.</div>
+        <pre class="code" id="baselineAnalysis">No analysis yet.</pre>
       </div>
       <div class="card">
         <div class="t">Baseline Strategy &amp; Backtest</div>
-        <pre id="baselineStrategy">No strategy yet.</pre>
+        <div id="baselineStrategySummary" class="prose muted">Run baseline to see a natural-language explanation.</div>
+        <pre class="code" id="baselineStrategy">No strategy yet.</pre>
       </div>
     </div>
     <div class="card">
-      <div class="t">Flow 2 — Your Feedback (AI Intuition)</div>
-      <div class="sub">Analysis ID: <code id="currentAnalysisId">None</code></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <div class="card-head">
         <div>
-          <label class="sub" for="feedbackVerdict">Overall Verdict</label>
-          <select id="feedbackVerdict" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);font-size:14px">
+          <div class="t">Flow 2 — Your Feedback</div>
+          <div class="sub">Analysis ID: <code class="id-chip" id="currentAnalysisId">None</code></div>
+        </div>
+        <span class="card-badge">Flow 2</span>
+      </div>
+      <div class="grid-2">
+        <div class="field">
+          <label for="feedbackVerdict">Overall verdict</label>
+          <select id="feedbackVerdict">
             <option value="partial" selected>Partial — some corrections</option>
             <option value="agree">Agree — analysis is fine</option>
             <option value="disagree">Disagree — major revision</option>
           </select>
         </div>
-        <div>
-          <label class="sub" for="feedbackDimension">Dimension (optional)</label>
-          <select id="feedbackDimension" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--muted);background:#0b1220;color:var(--text);font-size:14px">
+        <div class="field">
+          <label for="feedbackDimension">Dimension</label>
+          <select id="feedbackDimension">
             <option value="market_outlook">Market Outlook</option>
             <option value="sentiment">Sentiment</option>
             <option value="news_interpretation">News Interpretation</option>
@@ -188,102 +398,110 @@
           </select>
         </div>
       </div>
-      <textarea id="analysisFeedbackText" placeholder="Describe what the AI got wrong or what you'd emphasize differently..." style="margin-top:8px;min-height:70px"></textarea>
+      <div class="field"><label for="analysisFeedbackText">Your correction</label><textarea id="analysisFeedbackText" placeholder="What should the AI emphasize or revise?"></textarea></div>
       <div class="btns">
-        <button class="btn-warn" id="btnSubmitFeedback">Submit Feedback &amp; Revise<span class="spinner hide" id="feedbackSpinner"></span></button>
-        <button id="btnCompareAnalysis">Compare Baseline vs Revised</button>
+        <button class="btn btn-warn" id="btnSubmitFeedback">Submit Feedback<span class="spinner hide" id="feedbackSpinner"></span></button>
+        <button class="btn" id="btnCompareAnalysis">Compare Baseline vs Revised</button>
       </div>
     </div>
-    <div class="row">
+    <div class="grid-2">
       <div class="card">
         <div class="t">Revised Analysis</div>
-        <div id="revisedSummary" style="font-size:14px;line-height:1.6;min-height:40px;color:var(--sub)">Submit feedback to see revised analysis.</div>
-        <pre id="revisedAnalysis">No revision yet.</pre>
+        <div id="revisedSummary" class="prose muted">Submit feedback to see revised analysis.</div>
+        <pre class="code" id="revisedAnalysis">No revision yet.</pre>
       </div>
       <div class="card">
-        <div class="t">Compare &amp; Library</div>
-        <pre id="compareResults">No comparison yet.</pre>
-        <pre id="libraryResults" style="margin-top:8px;max-height:200px">Library not loaded.</pre>
+        <div class="t">Revised Strategy &amp; Backtest</div>
+        <div id="feedbackStrategySummary" class="prose muted">Submit feedback to see revised strategy explanation.</div>
+        <pre class="code" id="feedbackStrategy">No revised strategy yet.</pre>
       </div>
     </div>
-  </div>
+    <div class="card">
+      <div class="t">Compare &amp; Library</div>
+      <div id="compareNarrative" class="prose muted">No comparison yet.</div>
+      <pre class="code" id="compareResults">No comparison yet.</pre>
+      <pre class="code" id="libraryResults" style="max-height:200px;margin-top:8px">Library not loaded.</pre>
+    </div>
+  </section>
 
-  <!-- ───────────── TAB 4: Strategy ───────────── -->
-  <div id="tab-strategy" class="tab-panel">
-    <div class="row">
+  <!-- Strategy -->
+  <section id="tab-strategy" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-strategy" hidden>
+    <div class="grid-2">
       <div>
         <div class="card">
-          <div class="t">Request Strategy</div>
-          <div class="sub">Describe what strategy you want, or use the auto-generate button for a system-default strategy.</div>
-          <textarea id="strategyInput" placeholder='e.g. "Give me a strategy for holding BTC for 90 days" or "What stock should I buy in Chinese market?"'></textarea>
+          <div class="card-head"><div><div class="t">Request Strategy</div><div class="sub">Natural language or auto-generate from current market context.</div></div><span class="card-badge">Agent 3</span></div>
+          <div class="field"><label for="strategyInput">Your request</label><textarea id="strategyInput" placeholder='e.g. "Hold BTC for 90 days with tight stop-loss"'></textarea></div>
           <div class="btns">
-            <button class="btn-primary" id="btnUserStrategy">Generate from Request<span class="spinner hide" id="stratSpinner"></span></button>
-            <button id="btnAutoStrategy">Auto-Generate</button>
+            <button class="btn btn-primary" id="btnUserStrategy">Generate<span class="spinner hide" id="stratSpinner"></span></button>
+            <button class="btn" id="btnAutoStrategy">Auto-Generate</button>
           </div>
         </div>
         <div class="card">
           <div class="t">Manage Strategy</div>
-          <div class="sub">Current Strategy ID: <code id="currentStrategy">None</code></div>
+          <div class="sub">Strategy ID: <code class="id-chip" id="currentStrategy">None</code></div>
           <div class="btns">
-            <button id="btnGetStrategy">Refresh</button>
-            <button class="btn-ok" id="btnApprove">Approve</button>
-            <button class="btn-bad" id="btnReject">Reject</button>
+            <button class="btn" id="btnGetStrategy">Refresh</button>
+            <button class="btn btn-ok" id="btnApprove">Approve</button>
+            <button class="btn btn-bad" id="btnReject">Reject</button>
           </div>
-          <textarea id="feedbackInput" placeholder="Refinement feedback (optional)" style="margin-top:8px;min-height:50px"></textarea>
-          <div class="btns"><button class="btn-warn" id="btnRefine">Refine</button></div>
+          <div class="field"><label for="feedbackInput">Refinement feedback</label><textarea id="feedbackInput" placeholder="Optional refinement notes"></textarea></div>
+          <div class="btns"><button class="btn btn-warn" id="btnRefine">Refine</button></div>
         </div>
       </div>
       <div>
         <div class="card">
           <div class="t">AI Strategy Summary</div>
-          <div id="strategySummary" style="font-size:14px;color:var(--text);line-height:1.6;min-height:40px">Generate a strategy to see the AI summary here.</div>
+          <div id="strategySummary" class="prose muted">Generate a strategy to see the AI summary here.</div>
         </div>
         <div class="card">
-          <div class="t">Strategy Details (JSON)</div>
-          <pre id="strategyResults">No strategy yet.</pre>
+          <div class="t">Strategy Details</div>
+          <pre class="code" id="strategyResults">No strategy yet.</pre>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- ───────────── TAB 4: System ───────────── -->
-  <div id="tab-system" class="tab-panel">
-    <div class="row">
+  <!-- System -->
+  <section id="tab-system" class="tab-panel" role="tabpanel" aria-labelledby="tabbtn-system" hidden>
+    <div class="grid-2">
       <div class="card">
         <div class="t">System Status</div>
-        <button id="btnRefreshStatus">Refresh</button>
-        <pre id="statusBox">Loading...</pre>
+        <div class="btns" style="margin-top:0;margin-bottom:10px"><button class="btn" id="btnRefreshStatus">Refresh</button></div>
+        <pre class="code" id="statusBox">Loading…</pre>
       </div>
       <div class="card">
         <div class="t">Portfolio</div>
-        <button id="btnRefreshPortfolio">Refresh</button>
-        <pre id="portfolioBox">Loading...</pre>
+        <div class="btns" style="margin-top:0;margin-bottom:10px"><button class="btn" id="btnRefreshPortfolio">Refresh</button></div>
+        <pre class="code" id="portfolioBox">Loading…</pre>
       </div>
     </div>
     <div class="card">
-      <div class="t">News Digest (Background Cycle)</div>
-      <button id="btnRefreshNews">Refresh</button>
-      <pre id="newsDigestBox">Loading...</pre>
+      <div class="t">News Digest (background cycle)</div>
+      <div class="btns" style="margin-top:0;margin-bottom:10px"><button class="btn" id="btnRefreshNews">Refresh</button></div>
+      <pre class="code" id="newsDigestBox">Loading…</pre>
     </div>
-    <div class="card">
-      <div class="t">Recent Episodes</div>
-      <button id="btnRefreshEpisodes">Refresh</button>
-      <pre id="episodesBox">Loading...</pre>
-    </div>
-    <div class="card">
-      <div class="t">Behavior Stats</div>
-      <button id="btnRefreshBehavior">Refresh</button>
-      <pre id="behaviorBox">Loading...</pre>
+    <div class="grid-2">
+      <div class="card">
+        <div class="t">Recent Episodes</div>
+        <div class="btns" style="margin-top:0;margin-bottom:10px"><button class="btn" id="btnRefreshEpisodes">Refresh</button></div>
+        <pre class="code" id="episodesBox">Loading…</pre>
+      </div>
+      <div class="card">
+        <div class="t">Behavior Stats</div>
+        <div class="btns" style="margin-top:0;margin-bottom:10px"><button class="btn" id="btnRefreshBehavior">Refresh</button></div>
+        <pre class="code" id="behaviorBox">Loading…</pre>
+      </div>
     </div>
     <div class="card">
       <div class="t">Response Log</div>
-      <pre id="logBox">Ready.</pre>
+      <pre class="code" id="logBox" style="max-height:280px">Ready.</pre>
     </div>
-  </div>
+  </section>
 </div>
 
 <script>
 const API="";
+const TABS=["news","market","analysis","strategy","system"];
 let currentStrategyId=null;
 const $=id=>document.getElementById(id);
 const escapeHtml=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
@@ -293,22 +511,48 @@ const log=(label,obj)=>{const c=$("logBox").textContent;$("logBox").textContent=
 const setSid=sid=>{currentStrategyId=sid||null;$("currentStrategy").textContent=currentStrategyId||"None";};
 const spin=(id,on)=>$(id).classList.toggle("hide",!on);
 
+function statCard(label,value,cls=""){
+  return `<div class="stat ${cls}"><div class="label">${escapeHtml(label)}</div><div class="value">${escapeHtml(String(value))}</div></div>`;
+}
+
+function setStatusPill(fresh){
+  const el=$("statusPill");
+  el.className="pill "+(fresh?"ok":"warn");
+  el.innerHTML=`<span class="dot"></span>${fresh?"Healthy":"Stale"}`;
+}
+
+function switchTab(name,pushHash=true){
+  if(!TABS.includes(name))name="news";
+  document.querySelectorAll(".nav-tabs button").forEach(b=>{
+    const on=b.dataset.tab===name;
+    b.classList.toggle("active",on);
+    b.setAttribute("aria-selected",on?"true":"false");
+  });
+  TABS.forEach(t=>{
+    const panel=$("tab-"+t);
+    const on=t===name;
+    panel.classList.toggle("active",on);
+    panel.hidden=!on;
+  });
+  if(pushHash)history.pushState(null,"",`#${name}`);
+}
+
 function renderNewsItems(items,containerId){
   const c=$(containerId);
-  if(!items||!items.length){c.innerHTML='<div style="color:var(--sub);padding:8px">No results.</div>';return;}
+  if(!items||!items.length){c.innerHTML='<div class="empty">No results.</div>';return;}
   c.innerHTML=items.map(i=>{
     const s=i.sentiment_score??0;
-    const cls=s>0.1?'ni-pos':s<-0.1?'ni-neg':'ni-neu';
+    const cls=s>0.1?"ni-pos":s<-0.1?"ni-neg":"ni-neu";
     const label=s>0?`+${s.toFixed(2)}`:s.toFixed(2);
-    const title=escapeHtml(i.title||i.summary||'(no title)');
-    const plat=escapeHtml(i.metadata?.platform||i.source||'?');
-    const cat=escapeHtml(i.category||'');
+    const title=escapeHtml(i.title||i.summary||"(no title)");
+    const plat=escapeHtml(i.metadata?.platform||i.source||"?");
+    const cat=escapeHtml(i.category||"");
     const url=i.url;
-    const safeUrl=url&&/^https?:\/\//i.test(url)?escapeHtml(url):'';
-    const tag=safeUrl?'a':'div';
-    const href=safeUrl?` href="${safeUrl}" target="_blank" rel="noopener"`:'';
-    return `<${tag} class="news-item"${href}><div class="ni-title">${title}</div><div class="ni-meta">${plat}${cat?' · '+cat:''}<span class="ni-sentiment ${cls}">${label}</span></div></${tag}>`;
-  }).join('');
+    const safeUrl=url&&/^https?:\/\//i.test(url)?escapeHtml(url):"";
+    const tag=safeUrl?"a":"div";
+    const href=safeUrl?` href="${safeUrl}" target="_blank" rel="noopener"`:"";
+    return `<${tag} class="news-item"${href}><div class="ni-title">${title}</div><div class="ni-meta">${plat}${cat?" · "+cat:""}<span class="ni-sentiment ${cls}">${label}</span></div></${tag}>`;
+  }).join("");
 }
 
 async function call(path,opts={}){
@@ -318,44 +562,51 @@ async function call(path,opts={}){
   return body;
 }
 
-/* ── Tabs ── */
-document.querySelectorAll(".tabs button").forEach(btn=>{
+document.querySelectorAll(".nav-tabs button").forEach(btn=>{
+  btn.addEventListener("click",()=>switchTab(btn.dataset.tab));
+});
+window.addEventListener("popstate",()=>{
+  const tab=(location.hash||"#news").slice(1);
+  switchTab(tab,false);
+});
+document.querySelectorAll(".collapse-toggle").forEach(btn=>{
   btn.addEventListener("click",()=>{
-    document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("active"));
-    document.querySelectorAll(".tab-panel").forEach(p=>p.classList.remove("active"));
-    btn.classList.add("active");
-    $("tab-"+btn.dataset.tab).classList.add("active");
+    const target=$(btn.dataset.target);
+    const open=btn.getAttribute("aria-expanded")!=="true";
+    btn.setAttribute("aria-expanded",open?"true":"false");
+    target.classList.toggle("hide",!open);
   });
 });
 
-/* ── Tab 1: News Search ── */
 $("btnNewsSearch").onclick=async()=>{
   const q=$("newsQuery").value.trim();if(!q)return;
-  spin("newsSpinner",true);$("newsSummary").textContent="Searching...";
+  spin("newsSpinner",true);$("newsSummary").textContent="Searching…";$("newsSummary").className="prose muted";
   try{
     const out=await call("/news/search",{method:"POST",body:JSON.stringify({query:q})});
-    const src=out.source_breakdown||{};const srcText=Object.entries(src).map(([k,v])=>`${k}: ${v}`).join(", ")||"N/A";
-    const interp=out.llm_interpretation||{};const interpText=interp.query?`"${interp.query}" (${interp.search_mode})`:"direct";
+    const interp=out.llm_interpretation||{};
+    const interpText=interp.query?`"${interp.query}" (${interp.search_mode})`:"direct";
     const trItems=out.trendradar_items||[];const apiItems=out.api_items||[];
-    $("newsKpi").innerHTML=`<div><span>Total:</span> ${out.item_count}</div><div><span>TrendRadar:</span> ${trItems.length}</div><div><span>API:</span> ${apiItems.length}</div><div><span>Sentiment:</span> ${out.digest?.overall_market_sentiment?.toFixed(2)??"-"}</div><div><span>LLM Query:</span> ${interpText}</div>`;
-    $("newsSummary").textContent=out.llm_summary||"No AI summary available (check LLM API key).";
+    const sent=out.digest?.overall_market_sentiment;
+    $("newsKpi").innerHTML=[
+      statCard("Total",out.item_count),
+      statCard("TrendRadar",trItems.length),
+      statCard("API",apiItems.length),
+      statCard("Sentiment",sent?.toFixed(2)??"—",sent>0?"pos":sent<0?"neg":""),
+      statCard("LLM mode",interpText),
+    ].join("");
+    $("newsSummary").textContent=out.llm_summary||"No AI summary (check LLM API key).";
+    $("newsSummary").className="prose";
     $("trCount").textContent=trItems.length;
     $("apiCount").textContent=apiItems.length;
     renderNewsItems(trItems,"trResults");
     renderNewsItems(apiItems,"apiResults");
-    log("news_search",{query:q,tr:trItems.length,api:apiItems.length,sources:src});
-  }catch(e){$("newsSummary").textContent="Search failed.";$("trResults").innerHTML="Error";$("apiResults").innerHTML="Error";log("news_search_error",e);}
+    log("news_search",{query:q,tr:trItems.length,api:apiItems.length});
+  }catch(e){$("newsSummary").textContent="Search failed.";$("newsSummary").className="prose muted";renderNewsItems([],"trResults");log("news_search_error",e);}
   spin("newsSpinner",false);
 };
 $("newsQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnNewsSearch").click();});
 
-/* ── Tab 2: Market Data ── */
-{
-  const dFrom=$("mktDateFrom"),dTo=$("mktDateTo");
-  const today=new Date().toISOString().slice(0,10);
-  const d100=new Date(Date.now()-100*86400000).toISOString().slice(0,10);
-  dFrom.value=d100;dTo.value=today;
-}
+{const dFrom=$("mktDateFrom"),dTo=$("mktDateTo");const today=new Date().toISOString().slice(0,10);const d100=new Date(Date.now()-100*86400000).toISOString().slice(0,10);dFrom.value=d100;dTo.value=today;}
 $("btnMarketSearch").onclick=async()=>{
   const q=$("marketQuery").value.trim();if(!q)return;
   spin("marketSpinner",true);
@@ -365,43 +616,48 @@ $("btnMarketSearch").onclick=async()=>{
   try{
     const out=await call("/market/search",{method:"POST",body:JSON.stringify(payload)});
     const tickers=out.tickers||[];
-    $("marketKpi").innerHTML=`<div><span>Tickers:</span> ${tickers.join(", ")}</div><div><span>Range:</span> ${out.start_date} → ${out.end_date}</div><div><span>Interval:</span> ${out.interval}</div>`;
+    $("marketKpi").innerHTML=[
+      statCard("Tickers",tickers.join(", ")||"—"),
+      statCard("Range",`${out.start_date} → ${out.end_date}`),
+      statCard("Interval",out.interval),
+    ].join("");
     const ind={};
     for(const [tk,d] of Object.entries(out.data||{})){
-      ind[tk]={bars:d.bars_count,close:d.last_bar?.close,rsi:d.indicators?.rsi_14,sma20:d.indicators?.sma_20,sma50:d.indicators?.sma_50,macd:d.indicators?.macd,adx:d.indicators?.adx};
+      ind[tk]={bars:d.bars_count,close:d.last_bar?.close,rsi:d.indicators?.rsi_14,sma20:d.indicators?.sma_20,sma50:d.indicators?.sma_50};
     }
     pretty("marketIndicators",ind);
-    let tableHtml='';
+    let tableHtml="";
     for(const [tk,d] of Object.entries(out.data||{})){
       const bars=d.bars||[];
-      tableHtml+=`<div style="margin-bottom:8px"><strong>${tk}</strong> (${bars.length} bars)</div>`;
+      tableHtml+=`<div style="margin:10px 0 6px;font-weight:600">${escapeHtml(tk)} <span style="color:var(--sub);font-weight:400">(${bars.length} bars)</span></div>`;
       tableHtml+='<table class="bars-table"><thead><tr><th>Date</th><th>Open</th><th>High</th><th>Low</th><th>Close</th><th>Volume</th></tr></thead><tbody>';
       for(const b of bars.slice().reverse()){
-        tableHtml+=`<tr><td style="text-align:left">${b.date?.slice(0,16)||''}</td><td>${b.open}</td><td>${b.high}</td><td>${b.low}</td><td>${b.close}</td><td>${(b.volume||0).toLocaleString()}</td></tr>`;
+        tableHtml+=`<tr><td>${escapeHtml(b.date?.slice(0,16)||"")}</td><td>${b.open}</td><td>${b.high}</td><td>${b.low}</td><td>${b.close}</td><td>${(b.volume||0).toLocaleString()}</td></tr>`;
       }
-      tableHtml+='</tbody></table>';
+      tableHtml+="</tbody></table>";
     }
-    $("marketBarsContainer").innerHTML=tableHtml||'No bars.';
-    log("market_search",{query:q,tickers,interval:out.interval});
-  }catch(e){pretty("marketIndicators",e);$("marketBarsContainer").innerHTML='Error';log("market_search_error",e);}
+    $("marketBarsContainer").innerHTML=tableHtml||'<div class="empty">No bars.</div>';
+    log("market_search",{query:q,tickers});
+  }catch(e){pretty("marketIndicators",e);$("marketBarsContainer").innerHTML='<div class="empty">Error loading data.</div>';log("market_search_error",e);}
   spin("marketSpinner",false);
 };
 $("marketQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnMarketSearch").click();});
 
-/* ── Tab 3: Analysis Flow ── */
 let currentAnalysisId=null;
 const setAid=id=>{currentAnalysisId=id||null;$("currentAnalysisId").textContent=currentAnalysisId||"None";};
 const renderAnalysisSummary=(elId,analysis)=>{
-  if(!analysis){$(elId).textContent="No analysis.";return;}
+  if(!analysis){$(elId).textContent="No analysis.";$(elId).className="prose muted";return;}
   const dir=analysis.outlook?.direction||"?";
   const conf=(analysis.outlook?.confidence??0).toFixed(2);
   const score=(analysis.sentiment?.overall_score??0).toFixed(2);
   $(elId).textContent=`${dir.toUpperCase()} outlook (confidence ${conf}, sentiment ${score}). ${analysis.outlook?.narrative||""}`.slice(0,600);
+  $(elId).className="prose";
 };
 $("btnRunBaseline").onclick=async()=>{
   const q=$("analysisQuery").value.trim();if(!q)return;
   spin("analysisSpinner",true);
-  $("baselineSummary").textContent="Running baseline flow...";
+  $("baselineSummary").textContent="Running baseline flow…";$("baselineSummary").className="prose muted";
+  $("baselineStrategySummary").textContent="Running baseline flow…";$("baselineStrategySummary").className="prose muted";
   const tickers=$("analysisTickers").value.trim().split(/\s+/).filter(Boolean);
   const payload={query:q};if(tickers.length)payload.tickers=tickers;
   try{
@@ -409,14 +665,23 @@ $("btnRunBaseline").onclick=async()=>{
     setAid(out.analysis_id);
     renderAnalysisSummary("baselineSummary",out.baseline_analysis);
     pretty("baselineAnalysis",out.baseline_analysis);
+    $("baselineStrategySummary").textContent=out.baseline_explanation||"Explanation unavailable.";
+    $("baselineStrategySummary").className="prose";
     pretty("baselineStrategy",{strategy:out.baseline_strategy,reward:out.baseline_reward});
     if(out.baseline_strategy?.strategy_id)setSid(out.baseline_strategy.strategy_id);
-    $("revisedAnalysis").textContent="No revision yet.";
+    pretty("revisedAnalysis","No revision yet.");
     $("revisedSummary").textContent="Submit feedback to see revised analysis.";
-    $("compareResults").textContent="No comparison yet.";
+    $("revisedSummary").className="prose muted";
+    $("feedbackStrategySummary").textContent="Submit feedback to see revised strategy explanation.";
+    $("feedbackStrategySummary").className="prose muted";
+    pretty("feedbackStrategy","No revised strategy yet.");
+    $("compareNarrative").textContent="No comparison yet.";
+    $("compareNarrative").className="prose muted";
+    pretty("compareResults","No comparison yet.");
     log("analysis_baseline",out);
   }catch(e){
-    $("baselineSummary").textContent="Baseline failed.";
+    $("baselineSummary").textContent="Baseline failed.";$("baselineSummary").className="prose muted";
+    $("baselineStrategySummary").textContent="Baseline failed.";$("baselineStrategySummary").className="prose muted";
     pretty("baselineAnalysis",e);log("analysis_baseline_error",e);
   }
   spin("analysisSpinner",false);
@@ -424,95 +689,117 @@ $("btnRunBaseline").onclick=async()=>{
 $("btnSubmitFeedback").onclick=async()=>{
   if(!currentAnalysisId)return log("analysis_feedback","No analysis selected");
   spin("feedbackSpinner",true);
+  $("revisedSummary").textContent="Submitting feedback…";$("revisedSummary").className="prose muted";
+  $("feedbackStrategySummary").textContent="Submitting feedback…";$("feedbackStrategySummary").className="prose muted";
   const payload={
     overall_verdict:$("feedbackVerdict").value,
     free_text:$("analysisFeedbackText").value.trim()||null,
-    dimension_feedbacks:[{
-      dimension:$("feedbackDimension").value,
-      verdict:$("feedbackVerdict").value,
-      correction:$("analysisFeedbackText").value.trim()||null
-    }]
+    dimension_feedbacks:[{dimension:$("feedbackDimension").value,verdict:$("feedbackVerdict").value,correction:$("analysisFeedbackText").value.trim()||null}]
   };
   try{
     const out=await call(`/analysis/${currentAnalysisId}/feedback`,{method:"POST",body:JSON.stringify(payload)});
     renderAnalysisSummary("revisedSummary",out.revised_analysis);
     pretty("revisedAnalysis",out.revised_analysis);
-    pretty("baselineStrategy",{baseline:out.baseline_strategy,revised:out.feedback_strategy,rewards:{baseline:out.baseline_reward,feedback:out.feedback_reward}});
+    $("feedbackStrategySummary").textContent=out.feedback_explanation||"Explanation unavailable.";
+    $("feedbackStrategySummary").className="prose";
+    pretty("feedbackStrategy",{strategy:out.feedback_strategy,reward:out.feedback_reward});
+    pretty("baselineStrategy",{strategy:out.baseline_strategy,reward:out.baseline_reward});
+    if(out.comparison_narrative){
+      $("compareNarrative").textContent=out.comparison_narrative;
+      $("compareNarrative").className="prose";
+    }
+    pretty("compareResults",{
+      baseline_reward:out.baseline_reward,
+      feedback_reward:out.feedback_reward,
+    });
     if(out.feedback_strategy?.strategy_id)setSid(out.feedback_strategy.strategy_id);
     log("analysis_feedback",out);
   }catch(e){
-    $("revisedSummary").textContent="Feedback failed.";
+    $("revisedSummary").textContent="Feedback failed.";$("revisedSummary").className="prose muted";
+    $("feedbackStrategySummary").textContent="Feedback failed.";$("feedbackStrategySummary").className="prose muted";
     pretty("revisedAnalysis",e);log("analysis_feedback_error",e);
   }
   spin("feedbackSpinner",false);
 };
 $("btnCompareAnalysis").onclick=async()=>{
   if(!currentAnalysisId)return;
-  try{const out=await call(`/analysis/${currentAnalysisId}/compare`);pretty("compareResults",out);log("analysis_compare",out);}catch(e){pretty("compareResults",e);log("analysis_compare_error",e);}
+  try{
+    const out=await call(`/analysis/${currentAnalysisId}/compare`);
+    $("compareNarrative").textContent=out.comparison_narrative||"No narrative.";
+    $("compareNarrative").className="prose";
+    pretty("compareResults",out);
+    log("analysis_compare",out);
+  }catch(e){pretty("compareResults",e);}
 };
 $("btnRefreshLibrary").onclick=async()=>{
-  try{const out=await call("/library/strategies");pretty("libraryResults",out);log("strategy_library",out);}catch(e){pretty("libraryResults",e);}
+  try{
+    const rows=await call("/library/strategies?limit=50");
+    if(!Array.isArray(rows)){pretty("libraryResults",rows);return;}
+    const summary=rows.map(r=>({
+      name:r.name||r.template_id||r.entry_id,
+      origin:r.origin,
+      tags:(r.tags||[]).slice(0,4),
+      quality:r.quality_score,
+      reward:r.backtest_reward,
+      alphas:(r.alphas||[]).map(a=>a.formula_id||a.name).slice(0,2),
+    }));
+    pretty("libraryResults",{count:rows.length,entries:summary});
+  }catch(e){pretty("libraryResults",e);}
 };
-$("btnRefreshPrefs").onclick=async()=>{
-  try{const out=await call("/library/preferences");pretty("libraryResults",out);log("preferences",out);}catch(e){pretty("libraryResults",e);}
-};
+$("btnRefreshPrefs").onclick=async()=>{try{pretty("libraryResults",await call("/library/preferences"));}catch(e){pretty("libraryResults",e);}};
 $("analysisQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnRunBaseline").click();});
 
-/* ── Tab 4: Strategy ── */
 $("btnUserStrategy").onclick=async()=>{
   const req=$("strategyInput").value.trim();if(!req)return;
-  spin("stratSpinner",true);$("strategySummary").textContent="Generating strategy...";
+  spin("stratSpinner",true);$("strategySummary").textContent="Generating…";$("strategySummary").className="prose muted";
   try{
     const out=await call("/strategy/user-request",{method:"POST",body:JSON.stringify({request:req})});
     setSid(out?.strategy?.strategy_id);
     $("strategySummary").textContent=friendlySummary(out.summary,out?.strategy?.rationale);
+    $("strategySummary").className="prose";
     pretty("strategyResults",out);log("user_strategy",out);
-  }catch(e){$("strategySummary").textContent="Generation failed.";pretty("strategyResults",e);log("user_strategy_error",e);}
+  }catch(e){$("strategySummary").textContent="Generation failed.";pretty("strategyResults",e);}
   spin("stratSpinner",false);
 };
 $("btnAutoStrategy").onclick=async()=>{
-  spin("stratSpinner",true);$("strategySummary").textContent="Auto-generating strategy...";
+  spin("stratSpinner",true);$("strategySummary").textContent="Auto-generating…";
   try{
     const out=await call("/strategy/request-with-summary",{method:"POST",body:JSON.stringify({})});
     setSid(out?.strategy?.strategy_id);
     $("strategySummary").textContent=friendlySummary(out.summary,out?.strategy?.rationale);
+    $("strategySummary").className="prose";
     pretty("strategyResults",out);log("auto_strategy",out);
-  }catch(e){$("strategySummary").textContent="Generation failed.";pretty("strategyResults",e);log("auto_strategy_error",e);}
+  }catch(e){$("strategySummary").textContent="Generation failed.";pretty("strategyResults",e);}
   spin("stratSpinner",false);
 };
-$("btnGetStrategy").onclick=async()=>{
-  if(!currentStrategyId)return log("get_strategy","No strategy selected");
-  try{const out=await call(`/strategy/${currentStrategyId}`);pretty("strategyResults",out);log("get_strategy",out);}catch(e){log("get_strategy_error",e);}
-};
+$("btnGetStrategy").onclick=async()=>{if(!currentStrategyId)return;try{pretty("strategyResults",await call(`/strategy/${currentStrategyId}`));}catch(e){log("get_strategy_error",e);}};
 $("btnApprove").onclick=async()=>{
   if(!currentStrategyId)return;
   try{
     let status=await call(`/strategy/${currentStrategyId}`);
-    for(let i=0;i<12&&status.status==="evaluating";i++){
-      await new Promise(r=>setTimeout(r,1500));
-      status=await call(`/strategy/${currentStrategyId}`);
-    }
-    const out=await call(`/strategy/${currentStrategyId}/approve`,{method:"POST",body:JSON.stringify({})});
-    pretty("strategyResults",out);log("approve",out);
+    for(let i=0;i<12&&status.status==="evaluating";i++){await new Promise(r=>setTimeout(r,1500));status=await call(`/strategy/${currentStrategyId}`);}
+    pretty("strategyResults",await call(`/strategy/${currentStrategyId}/approve`,{method:"POST",body:JSON.stringify({})}));
+    refreshPortfolio();refreshStatus();
   }catch(e){log("approve_error",e);}
-  refreshPortfolio();refreshStatus();
 };
 $("btnReject").onclick=async()=>{
   if(!currentStrategyId)return;
-  try{const out=await call(`/strategy/${currentStrategyId}/reject`,{method:"POST",body:JSON.stringify({reason:"Rejected from dashboard"})});pretty("strategyResults",out);log("reject",out);}catch(e){log("reject_error",e);}
-  refreshStatus();
+  try{pretty("strategyResults",await call(`/strategy/${currentStrategyId}/reject`,{method:"POST",body:JSON.stringify({reason:"Rejected from dashboard"})}));refreshStatus();}catch(e){log("reject_error",e);}
 };
 $("btnRefine").onclick=async()=>{
   if(!currentStrategyId)return;
-  const fb=$("feedbackInput").value.trim();if(!fb)return log("refine","Feedback required");
-  try{
-    const out=await call(`/strategy/${currentStrategyId}/refine`,{method:"POST",body:JSON.stringify({feedback:fb})});
-    setSid(out?.strategy?.strategy_id||currentStrategyId);pretty("strategyResults",out);log("refine",out);
-  }catch(e){log("refine_error",e);}
+  const fb=$("feedbackInput").value.trim();if(!fb)return;
+  try{const out=await call(`/strategy/${currentStrategyId}/refine`,{method:"POST",body:JSON.stringify({feedback:fb})});setSid(out?.strategy?.strategy_id||currentStrategyId);pretty("strategyResults",out);}catch(e){log("refine_error",e);}
 };
 
-/* ── Tab 5: System ── */
-async function refreshStatus(){try{const s=await call("/system/status");pretty("statusBox",s);$("statusPill").textContent=s.news_fresh&&s.market_fresh?"Healthy":"Stale";$("modePill").textContent=s.paper_trading?"Paper Trading":"Live Trading";}catch(e){pretty("statusBox",e);}}
+async function refreshStatus(){
+  try{
+    const s=await call("/system/status");
+    pretty("statusBox",s);
+    setStatusPill(s.news_fresh&&s.market_fresh);
+    $("modePill").innerHTML=`<span class="dot"></span>${s.paper_trading?"Paper Trading":"Live Trading"}`;
+  }catch(e){pretty("statusBox",e);setStatusPill(false);}
+}
 async function refreshPortfolio(){try{pretty("portfolioBox",await call("/portfolio"));}catch(e){pretty("portfolioBox",e);}}
 async function refreshDigest(){try{pretty("newsDigestBox",await call("/news/digest"));}catch(e){pretty("newsDigestBox",e);}}
 async function refreshEpisodes(){try{pretty("episodesBox",await call("/history/episodes?n=10"));}catch(e){pretty("episodesBox",e);}}
@@ -523,6 +810,7 @@ $("btnRefreshNews").onclick=refreshDigest;
 $("btnRefreshEpisodes").onclick=refreshEpisodes;
 $("btnRefreshBehavior").onclick=refreshBehavior;
 
+switchTab((location.hash||"#news").slice(1),false);
 refreshStatus();refreshPortfolio();refreshDigest();refreshEpisodes();refreshBehavior();
 </script>
 </body>

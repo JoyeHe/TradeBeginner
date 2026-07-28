@@ -25,6 +25,7 @@ from tools.analysis_helpers import (
     build_news_bundle_from_search,
     heuristic_market_analysis,
 )
+from tools.strategy_constraints import apply_strategy_constraints, strategies_materially_different
 
 logger = structlog.get_logger(__name__)
 
@@ -119,7 +120,60 @@ class AnalysisFlow:
         strategy.analysis_id = analysis.analysis_id
         strategy.rationale = f"{analysis.outlook.narrative}\n\n{strategy.rationale}"
         strategy.data_sources_used = list(set(strategy.data_sources_used + analysis.data_sources + ["market_analysis"]))
+        requested = list((analysis.market_evidence or {}).get("tickers") or {})
+        strategy, _ = apply_strategy_constraints(strategy, self.agent3.settings, requested_tickers=requested or None)
         return strategy
+
+    def _promote_gate(self, reward) -> bool:
+        if reward is None:
+            return False
+        settings = self.agent3.settings
+        bt = reward.backtest_result
+        if bt.partial_data:
+            return False
+        if bt.total_trades < int(getattr(settings, "library_min_trades", 3)):
+            return False
+        if float(reward.terminal_reward) < float(getattr(settings, "library_min_reward", 0.55)):
+            return False
+        return True
+
+    async def _maybe_promote(
+        self,
+        *,
+        user_id: str,
+        analysis_id: str,
+        strategy: Strategy,
+        reward,
+        tags: list[str],
+        origin: LibraryOrigin,
+        force: bool = False,
+    ) -> None:
+        if not force and not self._promote_gate(reward):
+            logger.info("library_promote_skipped", analysis_id=analysis_id, origin=origin.value)
+            return
+        entry = StrategyLibraryEntry(
+            user_id=user_id,
+            source_analysis_id=analysis_id,
+            strategy=strategy,
+            template_id=(strategy.metadata or {}).get("template_id"),
+            name=(strategy.metadata or {}).get("template_id") or strategy.strategy_id,
+            backtest_reward=None if reward is None else reward.terminal_reward,
+            backtest_metrics={} if reward is None else reward.model_dump(mode="json"),
+            tags=tags,
+            origin=origin if force or origin == LibraryOrigin.PROMOTED else LibraryOrigin.PROMOTED,
+            quality_score=0.5 if reward is None else float(reward.terminal_reward),
+            parent_template_id=(strategy.metadata or {}).get("template_id"),
+        )
+        saved = await self.store.promote_library_entry(entry)
+        strategy.library_entry_id = saved.entry_id
+        try:
+            await self.memory.semantic.store_knowledge(
+                content=f"Promoted strategy template={saved.template_id} reward={saved.backtest_reward} tags={saved.tags}",
+                metadata={"entry_id": saved.entry_id, "user_id": user_id, "origin": "strategy_template"},
+                category="strategy_template",
+            )
+        except Exception as exc:
+            logger.warning("strategy_template_semantic_failed", error=str(exc))
 
     async def run_baseline(self, query: str, tickers: Optional[list[str]] = None, user_id: str = "default") -> AnalysisSession:
         news_bundle, market_evidence = await self._fetch_inputs(query, tickers)
@@ -129,24 +183,30 @@ class AnalysisFlow:
         session = self.store.create_session(analysis)
         session.status = "generating_strategy"
         strategy = await self.generate_strategy_from_analysis(analysis)
+        if tickers:
+            strategy, _ = apply_strategy_constraints(strategy, self.agent3.settings, requested_tickers=tickers)
         session.baseline_strategy = strategy
         session.status = "evaluating"
         try:
             session.baseline_reward = await self.agent6.evaluate_strategy(strategy)
         except Exception as exc:
             logger.warning("baseline_backtest_failed", error=str(exc))
+        try:
+            session.baseline_explanation = await self.agent3.explain_strategy_and_backtest(
+                strategy, session.baseline_reward, query=query
+            )
+        except Exception as exc:
+            logger.warning("baseline_explanation_failed", error=str(exc))
+            session.baseline_explanation = strategy.rationale
         session.status = "ready"
-        entry = StrategyLibraryEntry(
+        await self._maybe_promote(
             user_id=user_id,
-            source_analysis_id=analysis.analysis_id,
+            analysis_id=analysis.analysis_id,
             strategy=strategy,
-            backtest_reward=None if session.baseline_reward is None else session.baseline_reward.terminal_reward,
-            backtest_metrics={} if session.baseline_reward is None else session.baseline_reward.model_dump(mode="json"),
+            reward=session.baseline_reward,
             tags=[analysis.outlook.direction.value, analysis.flow_type.value],
             origin=LibraryOrigin.BASELINE,
         )
-        self.store.add_library_entry(entry)
-        strategy.library_entry_id = entry.entry_id
         await self.memory.semantic.store_knowledge(
             content=f"{analysis.outlook.narrative} | sentiment={analysis.sentiment.overall_score}",
             metadata={"analysis_id": analysis.analysis_id, "user_id": user_id, "origin": "baseline"},
@@ -191,13 +251,47 @@ class AnalysisFlow:
 
         session.revised_analysis = revised
         session.status = "generating_strategy"
-        strategy = await self.generate_strategy_from_analysis(revised)
+        strategy = await self.agent3.generate_strategy_from_feedback(
+            baseline_analysis=session.baseline_analysis,
+            baseline_strategy=session.baseline_strategy,
+            baseline_reward=session.baseline_reward,
+            feedback_text=correction_text,
+            overall_verdict=feedback.overall_verdict,
+            preference_hints=hints,
+        )
+        strategy.analysis_id = revised.analysis_id
+        strategy.rationale = f"{revised.outlook.narrative}\n\n{strategy.rationale}"
+        strategy, _ = apply_strategy_constraints(strategy, self.agent3.settings)
         session.feedback_strategy = strategy
         session.status = "evaluating"
         try:
             session.feedback_reward = await self.agent6.evaluate_strategy(strategy)
         except Exception as exc:
             logger.warning("feedback_backtest_failed", error=str(exc))
+        try:
+            session.feedback_explanation = await self.agent3.explain_strategy_and_backtest(
+                strategy, session.feedback_reward, query=session.baseline_analysis.query_context
+            )
+        except Exception as exc:
+            logger.warning("feedback_explanation_failed", error=str(exc))
+            session.feedback_explanation = strategy.rationale
+        session.material_change = strategies_materially_different(session.baseline_strategy, strategy)
+        if session.baseline_strategy is not None:
+            try:
+                session.comparison_narrative = await self.agent3.compare_strategy_outcomes(
+                    session.baseline_strategy,
+                    session.baseline_reward,
+                    strategy,
+                    session.feedback_reward,
+                    feedback_text=correction_text,
+                )
+                if session.material_change is False:
+                    session.comparison_narrative = (
+                        (session.comparison_narrative or "")
+                        + "\n\n[System] No material change in tickers/actions/sizes/stops/horizons; identical metrics may be expected."
+                    )
+            except Exception as exc:
+                logger.warning("comparison_narrative_failed", error=str(exc))
         session.status = "ready"
 
         await self.agent5.on_analysis_feedback(session.baseline_analysis, revised, feedback)
@@ -211,17 +305,16 @@ class AnalysisFlow:
                 "overall_verdict": feedback.overall_verdict,
             }
         )
-        entry = StrategyLibraryEntry(
+        force = feedback.overall_verdict == "agree"
+        await self._maybe_promote(
             user_id=feedback.user_id,
-            source_analysis_id=revised.analysis_id,
+            analysis_id=revised.analysis_id,
             strategy=strategy,
-            backtest_reward=None if session.feedback_reward is None else session.feedback_reward.terminal_reward,
-            backtest_metrics={} if session.feedback_reward is None else session.feedback_reward.model_dump(mode="json"),
+            reward=session.feedback_reward,
             tags=[revised.outlook.direction.value, "post_feedback"],
             origin=LibraryOrigin.POST_FEEDBACK,
+            force=force,
         )
-        self.store.add_library_entry(entry)
-        strategy.library_entry_id = entry.entry_id
         await self.memory.semantic.store_knowledge(
             content=f"User correction: {correction_text} | Revised: {revised.outlook.narrative}",
             metadata={"analysis_id": revised.analysis_id, "user_id": feedback.user_id, "origin": "post_feedback"},
@@ -243,6 +336,10 @@ class AnalysisFlow:
             "feedback_strategy": _dump(session.feedback_strategy),
             "baseline_reward": _dump(session.baseline_reward),
             "feedback_reward": _dump(session.feedback_reward),
+            "baseline_explanation": session.baseline_explanation,
+            "feedback_explanation": session.feedback_explanation,
+            "comparison_narrative": session.comparison_narrative,
+            "material_change": session.material_change,
             "feedbacks": [_dump(f) for f in session.feedbacks],
         }
 
@@ -252,23 +349,50 @@ class AnalysisFlow:
             return {"status": "not_found"}
         return self.session_to_dict(session)
 
-    def compare_session(self, analysis_id: str) -> dict:
+    async def compare_session(self, analysis_id: str) -> dict:
         session = self.store.get_session(analysis_id)
         if session is None:
             return {"status": "not_found"}
         base_r = None if session.baseline_reward is None else session.baseline_reward.terminal_reward
         fb_r = None if session.feedback_reward is None else session.feedback_reward.terminal_reward
+        if (
+            session.comparison_narrative is None
+            and session.baseline_strategy is not None
+            and session.feedback_strategy is not None
+        ):
+            fb_text = ""
+            if session.feedbacks:
+                last = session.feedbacks[-1]
+                fb_text = last.free_text or ""
+            try:
+                session.comparison_narrative = await self.agent3.compare_strategy_outcomes(
+                    session.baseline_strategy,
+                    session.baseline_reward,
+                    session.feedback_strategy,
+                    session.feedback_reward,
+                    feedback_text=fb_text,
+                )
+            except Exception as exc:
+                logger.warning("comparison_narrative_failed", error=str(exc))
         return {
             "analysis_id": analysis_id,
             "baseline": {
                 "analysis": session.baseline_analysis.model_dump(mode="json"),
+                "strategy": None if session.baseline_strategy is None else session.baseline_strategy.model_dump(mode="json"),
+                "reward": None if session.baseline_reward is None else session.baseline_reward.model_dump(mode="json"),
+                "explanation": session.baseline_explanation,
                 "strategy_id": None if session.baseline_strategy is None else session.baseline_strategy.strategy_id,
-                "reward": base_r,
+                "terminal_reward": base_r,
             },
             "revised": {
                 "analysis": None if session.revised_analysis is None else session.revised_analysis.model_dump(mode="json"),
+                "strategy": None if session.feedback_strategy is None else session.feedback_strategy.model_dump(mode="json"),
+                "reward": None if session.feedback_reward is None else session.feedback_reward.model_dump(mode="json"),
+                "explanation": session.feedback_explanation,
                 "strategy_id": None if session.feedback_strategy is None else session.feedback_strategy.strategy_id,
-                "reward": fb_r,
+                "terminal_reward": fb_r,
             },
             "reward_delta": None if base_r is None or fb_r is None else fb_r - base_r,
+            "comparison_narrative": session.comparison_narrative,
+            "material_change": session.material_change,
         }

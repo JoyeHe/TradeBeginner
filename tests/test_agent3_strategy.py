@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock
 
 import pytest
 
 from agents.agent3_strategy import Agent3Strategy
 from config.settings import Settings
 from memory.working import WorkingMemory
-from schemas.strategy import MarketRegime, Strategy
+from schemas.rewards import BacktestResult, RewardSignal
+from schemas.strategy import MarketRegime, Position, PositionAction, RiskMetrics, Strategy
 
 
 def _diag(function_tested: str, input_value, expected, actual, diagnosis: str) -> str:
@@ -78,7 +80,9 @@ async def test_gather_context_all_sources(monkeypatch: pytest.MonkeyPatch, base_
         "portfolio_state",
         "recent_episodes",
         "semantic_knowledge",
+        "library_candidates",
     }
+    assert context["library_candidates"] == []
     assert context["market_snapshot"] is not None
     assert context["recent_episodes"]
     assert context["semantic_knowledge"]
@@ -240,6 +244,196 @@ async def test_strategy_written_to_working_memory(monkeypatch: pytest.MonkeyPatc
     active = await memory.working.get("active_strategy")
     assert active is not None
     assert active.strategy_id == out.strategy_id
+
+
+@pytest.mark.asyncio
+async def test_explain_strategy_and_backtest(monkeypatch: pytest.MonkeyPatch):
+    """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.explain_strategy_and_backtest"""
+    memory = _MemoryStub({"working_memory": {}, "recent_episodes": [], "semantic_knowledge": []})
+    agent, _ = _build_agent(monkeypatch, memory)
+    monkeypatch.setattr(
+        "agents.common.llm_chat",
+        AsyncMock(return_value="This long strategy uses AAPL with a controlled risk profile."),
+    )
+    strategy = Strategy(
+        market_regime=MarketRegime.BULL,
+        positions=[
+            Position(
+                asset="AAPL",
+                action=PositionAction.LONG,
+                size_pct=10.0,
+                stop_loss_pct=3.0,
+                take_profit_pct=8.0,
+                time_horizon_days=10,
+                confidence=0.7,
+            )
+        ],
+        rationale="earnings momentum",
+        risk_metrics=RiskMetrics(total_exposure_pct=10.0),
+    )
+    reward = RewardSignal(
+        strategy_id=strategy.strategy_id,
+        terminal_reward=0.42,
+        backtest_result=BacktestResult(
+            strategy_id=strategy.strategy_id,
+            backtest_start=datetime.now(timezone.utc),
+            backtest_end=datetime.now(timezone.utc),
+            total_return=0.08,
+            sharpe_ratio=1.1,
+            max_drawdown=0.05,
+            win_rate=0.6,
+            profit_factor=1.3,
+            total_trades=5,
+            avg_trade_return=0.01,
+            volatility=0.12,
+        ),
+    )
+    text = await agent.explain_strategy_and_backtest(strategy, reward, query="AAPL outlook")
+    assert "AAPL" in text or "risk" in text.lower() or len(text) > 20
+
+
+@pytest.mark.asyncio
+async def test_generate_strategy_from_feedback_includes_fusion(monkeypatch: pytest.MonkeyPatch):
+    """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.generate_strategy_from_feedback"""
+    memory = _MemoryStub({"working_memory": {}, "recent_episodes": [], "semantic_knowledge": []})
+    agent, _ = _build_agent(monkeypatch, memory)
+    captured: dict = {}
+
+    async def fake_generate(context):
+        captured["context"] = context
+        return Strategy(
+            market_regime=MarketRegime.BULL,
+            positions=[
+                Position(
+                    asset="AAPL",
+                    action=PositionAction.LONG,
+                    size_pct=5.0,
+                    stop_loss_pct=3.0,
+                    take_profit_pct=6.0,
+                    time_horizon_days=7,
+                    confidence=0.6,
+                )
+            ],
+            rationale="revised after feedback",
+            risk_metrics=RiskMetrics(total_exposure_pct=5.0),
+        )
+
+    monkeypatch.setattr(agent, "generate_strategy", fake_generate)
+    from schemas.analysis import FlowType, MarketAnalysis, MarketOutlook, OutlookDirection, SentimentView
+
+    analysis = MarketAnalysis(
+        user_id="u",
+        query_context="AAPL outlook",
+        flow_type=FlowType.BASELINE,
+        sentiment=SentimentView(overall_score=0.2, key_themes=["earnings"]),
+        outlook=MarketOutlook(
+            direction=OutlookDirection.NEUTRAL,
+            horizon_days=14,
+            confidence=0.5,
+            affected_assets=["AAPL"],
+            narrative="Neutral near-term",
+        ),
+        news_bundle={},
+        market_evidence={},
+    )
+    baseline = await fake_generate({})
+    out = await agent.generate_strategy_from_feedback(
+        baseline_analysis=analysis,
+        baseline_strategy=baseline,
+        baseline_reward=None,
+        feedback_text="Make outlook more cautious; cut size",
+        overall_verdict="partial",
+        preference_hints=[{"prior_feedback": "prefer lower size"}],
+    )
+    assert out.positions
+    ctx = captured["context"]
+    assert "feedback" in ctx or "user_feedback" in ctx
+    assert "baseline_strategy" in ctx or "prior_strategy" in ctx
+
+
+@pytest.mark.asyncio
+async def test_compare_strategy_outcomes(monkeypatch: pytest.MonkeyPatch):
+    """FUNCTION TESTED: agents.agent3_strategy.Agent3Strategy.compare_strategy_outcomes"""
+    memory = _MemoryStub({"working_memory": {}, "recent_episodes": [], "semantic_knowledge": []})
+    agent, _ = _build_agent(monkeypatch, memory)
+    monkeypatch.setattr(
+        "agents.common.llm_chat",
+        AsyncMock(return_value="Revised cuts size and improves drawdown vs baseline."),
+    )
+    s1 = Strategy(
+        market_regime=MarketRegime.BULL,
+        positions=[
+            Position(
+                asset="AAPL",
+                action=PositionAction.LONG,
+                size_pct=10.0,
+                stop_loss_pct=3.0,
+                take_profit_pct=8.0,
+                time_horizon_days=10,
+                confidence=0.7,
+            )
+        ],
+        rationale="baseline momentum",
+        risk_metrics=RiskMetrics(total_exposure_pct=10.0),
+    )
+    r1 = RewardSignal(
+        strategy_id=s1.strategy_id,
+        terminal_reward=0.35,
+        backtest_result=BacktestResult(
+            strategy_id=s1.strategy_id,
+            backtest_start=datetime.now(timezone.utc),
+            backtest_end=datetime.now(timezone.utc),
+            total_return=0.06,
+            sharpe_ratio=0.9,
+            max_drawdown=0.08,
+            win_rate=0.55,
+            profit_factor=1.1,
+            total_trades=4,
+            avg_trade_return=0.01,
+            volatility=0.14,
+        ),
+    )
+    s2 = Strategy(
+        market_regime=MarketRegime.BULL,
+        positions=[
+            Position(
+                asset="AAPL",
+                action=PositionAction.LONG,
+                size_pct=5.0,
+                stop_loss_pct=2.5,
+                take_profit_pct=6.0,
+                time_horizon_days=10,
+                confidence=0.6,
+            )
+        ],
+        rationale="revised cautious sizing",
+        risk_metrics=RiskMetrics(total_exposure_pct=5.0),
+    )
+    r2 = RewardSignal(
+        strategy_id=s2.strategy_id,
+        terminal_reward=0.48,
+        backtest_result=BacktestResult(
+            strategy_id=s2.strategy_id,
+            backtest_start=datetime.now(timezone.utc),
+            backtest_end=datetime.now(timezone.utc),
+            total_return=0.05,
+            sharpe_ratio=1.2,
+            max_drawdown=0.04,
+            win_rate=0.62,
+            profit_factor=1.4,
+            total_trades=4,
+            avg_trade_return=0.012,
+            volatility=0.10,
+        ),
+    )
+    text = await agent.compare_strategy_outcomes(
+        baseline_strategy=s1,
+        baseline_reward=r1,
+        revised_strategy=s2,
+        revised_reward=r2,
+        feedback_text="more cautious",
+    )
+    assert len(text) > 20
 
 
 @pytest.mark.asyncio

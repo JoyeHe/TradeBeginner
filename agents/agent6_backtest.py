@@ -12,7 +12,7 @@ from config.settings import Settings
 from memory import MemoryManager
 from schemas.rewards import RewardSignal
 from schemas.strategy import Strategy
-from tools.backtest_tools import compute_reward, run_backtest
+from tools.backtest_tools import compute_reward, run_backtest, walk_forward_analysis
 
 logger = structlog.get_logger(__name__)
 
@@ -35,13 +35,35 @@ class Agent6Backtest:
         )
 
     async def evaluate_strategy(self, strategy: Strategy) -> RewardSignal:
-        """Rolling-window evaluation for a single strategy."""
+        """Multi-window evaluation; falls back to single-window reward."""
         tickers = sorted({p.asset for p in strategy.positions})
         end = date.today()
-        start = end - timedelta(days=self.settings.backtest_window_days * 3)
+        start = end - timedelta(days=max(self.settings.backtest_window_days * 6, 90))
         data = await self.agent2.get_backtest_data(tickers, start, end)
-        result = await run_backtest(strategy=strategy, historical_data=data)
-        reward = await compute_reward(result, self.settings)
+        # Prefer walk-forward average when enough history; still return a RewardSignal
+        try:
+            wf = await walk_forward_analysis(
+                strategy,
+                data,
+                self.settings,
+                total_lookback_days=min(120, max(len(next(iter(data.values()))) if data else 0, 40)),
+                window_size_days=min(20, self.settings.backtest_window_days),
+                step_days=10,
+            )
+            # Recompute primary window for structured backtest_result
+            primary = await run_backtest(strategy=strategy, historical_data=data)
+            reward = await compute_reward(primary, self.settings)
+            # Blend toward walk-forward average when available
+            avg = float(wf.get("avg_reward") or reward.terminal_reward)
+            reward.terminal_reward = float(0.5 * reward.terminal_reward + 0.5 * avg)
+            reward.component_rewards = {
+                **reward.component_rewards,
+                "walk_forward_avg": avg,
+            }
+        except Exception as exc:
+            logger.warning("walk_forward_eval_failed", error=str(exc))
+            primary = await run_backtest(strategy=strategy, historical_data=data)
+            reward = await compute_reward(primary, self.settings)
         await self.memory.working.set(f"backtest:{strategy.strategy_id}", reward, category="backtest")
         return reward
 
@@ -66,4 +88,3 @@ class Agent6Backtest:
             except Exception as exc:
                 logger.error("batch_backtest_failed", strategy_id=strategy.strategy_id, error=str(exc))
         return out
-

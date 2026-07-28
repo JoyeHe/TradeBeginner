@@ -6,10 +6,9 @@ from typing import Optional
 
 import structlog
 
+from memory.strategy_library_store import StrategyLibraryStore
 from schemas.analysis import MarketAnalysis
 from schemas.analysis_feedback import AnalysisFeedback
-from schemas.rewards import RewardSignal
-from schemas.strategy import Strategy
 from schemas.strategy_library import StrategyLibraryEntry
 
 logger = structlog.get_logger(__name__)
@@ -21,10 +20,14 @@ class AnalysisSession:
     def __init__(self, analysis: MarketAnalysis):
         self.baseline_analysis: MarketAnalysis = analysis
         self.revised_analysis: Optional[MarketAnalysis] = None
-        self.baseline_strategy: Optional[Strategy] = None
-        self.feedback_strategy: Optional[Strategy] = None
-        self.baseline_reward: Optional[RewardSignal] = None
-        self.feedback_reward: Optional[RewardSignal] = None
+        self.baseline_strategy = None
+        self.feedback_strategy = None
+        self.baseline_reward = None
+        self.feedback_reward = None
+        self.baseline_explanation: Optional[str] = None
+        self.feedback_explanation: Optional[str] = None
+        self.comparison_narrative: Optional[str] = None
+        self.material_change: Optional[bool] = None
         self.feedbacks: list[AnalysisFeedback] = []
         self.status: str = "analysis_ready"
 
@@ -34,11 +37,12 @@ class AnalysisSession:
 
 
 class AnalysisStore:
-    """Memory-backed analysis session and strategy library store."""
+    """Memory-backed analysis session store with delegated strategy library."""
 
-    def __init__(self) -> None:
+    def __init__(self, library: Optional[StrategyLibraryStore] = None) -> None:
         self._sessions: dict[str, AnalysisSession] = {}
-        self._library: list[StrategyLibraryEntry] = []
+        self._library_fallback: list[StrategyLibraryEntry] = []
+        self.library = library
         self._preference_records: list[dict] = []
 
     def create_session(self, analysis: MarketAnalysis) -> AnalysisSession:
@@ -54,11 +58,39 @@ class AnalysisStore:
         if session is not None:
             session.feedbacks.append(feedback)
 
-    def add_library_entry(self, entry: StrategyLibraryEntry) -> None:
-        self._library.append(entry)
+    def add_library_entry(self, entry: StrategyLibraryEntry) -> StrategyLibraryEntry:
+        if self.library is not None:
+            return self.library.add_entry(entry)
+        self._library_fallback.append(entry)
+        return entry
 
-    def list_library(self, user_id: str = "default", limit: int = 50) -> list[StrategyLibraryEntry]:
-        items = [e for e in self._library if e.user_id == user_id]
+    async def upsert_library_entry(self, entry: StrategyLibraryEntry) -> StrategyLibraryEntry:
+        if self.library is not None:
+            return await self.library.upsert(entry)
+        return self.add_library_entry(entry)
+
+    async def promote_library_entry(self, entry: StrategyLibraryEntry) -> StrategyLibraryEntry:
+        if self.library is not None:
+            return await self.library.promote_or_merge(entry)
+        return self.add_library_entry(entry)
+
+    def list_library(
+        self,
+        user_id: str = "default",
+        limit: int = 50,
+        tag: Optional[str] = None,
+        min_reward: Optional[float] = None,
+        include_global: bool = True,
+    ) -> list[StrategyLibraryEntry]:
+        if self.library is not None:
+            return self.library.list_entries(
+                user_id=user_id,
+                limit=limit,
+                tag=tag,
+                min_reward=min_reward,
+                include_global=include_global,
+            )
+        items = [e for e in self._library_fallback if e.user_id == user_id or (include_global and e.user_id == "*")]
         return sorted(items, key=lambda x: x.created_at, reverse=True)[:limit]
 
     def record_preference(self, record: dict) -> None:
@@ -79,9 +111,8 @@ class AnalysisStore:
         return [r for _, r in scored[:n]]
 
     def preference_stats(self, user_id: str = "default") -> dict:
-        user_recs = [r for r in self._preference_records if r.get("user_id", "default") == user_id]
+        prefs = [r for r in self._preference_records if r.get("user_id", "default") == user_id]
         return {
-            "total_preference_records": len(user_recs),
-            "library_entries": len([e for e in self._library if e.user_id == user_id]),
-            "active_sessions": len(self._sessions),
+            "total_preference_records": len(prefs),
+            "library_entries": len(self.list_library(user_id=user_id, limit=1000)),
         }

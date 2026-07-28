@@ -17,6 +17,7 @@ from agents.agent6_backtest import Agent6Backtest
 from config.settings import Settings
 from memory import MemoryManager
 from memory.analysis_store import AnalysisStore
+from memory.strategy_library_store import StrategyLibraryStore
 from orchestrator.analysis_flow import AnalysisFlow
 from risk.controller import RiskController
 from schemas.execution import PortfolioState
@@ -73,7 +74,13 @@ class TradingPipeline:
         self.agent5 = Agent5BehaviorStub(self.memory)
         self.agent6 = Agent6Backtest(settings, self.memory, agent2=self.agent2)
         self.risk = RiskController(settings)
-        self.analysis_store = AnalysisStore()
+        self.strategy_library = StrategyLibraryStore(
+            postgres_url=settings.postgres_url,
+            seed_path=settings.strategy_library_seed_path,
+            learned_path=settings.strategy_library_learned_path,
+        )
+        self.analysis_store = AnalysisStore(library=self.strategy_library)
+        self.agent3.library_store = self.strategy_library
         self.analysis_flow = AnalysisFlow(
             self.agent1,
             self.agent2,
@@ -91,6 +98,7 @@ class TradingPipeline:
     async def initialize(self) -> None:
         """Initialize memory and bootstrap data."""
         await self.memory.initialize()
+        await self.strategy_library.initialize()
         await self.agent1.run_news_cycle()
         await self.agent2.run_market_update(self._watchlist)
         portfolio = await self.agent4.get_current_portfolio()
@@ -107,6 +115,7 @@ class TradingPipeline:
                 pass
         for task in list(self._eval_tasks.values()):
             task.cancel()
+        await self.strategy_library.shutdown()
         await self.memory.shutdown()
 
     async def start_background_tasks(self) -> None:
@@ -318,13 +327,47 @@ class TradingPipeline:
         return self.analysis_flow.get_session_payload(analysis_id)
 
     async def compare_analysis_session(self, analysis_id: str) -> dict:
-        return self.analysis_flow.compare_session(analysis_id)
+        return await self.analysis_flow.compare_session(analysis_id)
 
-    async def list_strategy_library(self, user_id: str = "default", limit: int = 50) -> list[dict]:
-        entries = self.analysis_store.list_library(user_id=user_id, limit=limit)
+    async def list_strategy_library(
+        self,
+        user_id: str = "default",
+        limit: int = 50,
+        tag: str | None = None,
+        min_reward: float | None = None,
+    ) -> list[dict]:
+        entries = self.analysis_store.list_library(
+            user_id=user_id, limit=limit, tag=tag, min_reward=min_reward, include_global=True
+        )
         return [e.model_dump(mode="json") for e in entries]
+
+    async def get_strategy_library_entry(self, entry_id: str) -> dict:
+        entry = self.strategy_library.get(entry_id)
+        if entry is None:
+            return {"status": "not_found"}
+        return entry.model_dump(mode="json")
+
+    async def search_strategy_library(self, query: str, user_id: str = "default", limit: int = 20) -> list[dict]:
+        return [e.model_dump(mode="json") for e in self.strategy_library.search(query, user_id=user_id, limit=limit)]
+
+    async def promote_strategy_to_library(self, entry: dict, force: bool = False) -> dict:
+        from schemas.strategy_library import StrategyLibraryEntry
+
+        parsed = StrategyLibraryEntry.model_validate(entry)
+        if not force:
+            reward = parsed.backtest_reward
+            trades = (parsed.backtest_metrics or {}).get("backtest_result", {}).get("total_trades")
+            if trades is None:
+                trades = (parsed.backtest_metrics or {}).get("total_trades", 0)
+            partial = (parsed.backtest_metrics or {}).get("backtest_result", {}).get("partial_data")
+            if partial is None:
+                partial = (parsed.backtest_metrics or {}).get("partial_data", False)
+            if partial or (reward is None) or reward < self.settings.library_min_reward or int(trades or 0) < self.settings.library_min_trades:
+                return {"status": "rejected", "reason": "promote_gate_failed", "entry": parsed.model_dump(mode="json")}
+        saved = await self.analysis_store.promote_library_entry(parsed)
+        return {"status": "ok", "entry": saved.model_dump(mode="json")}
 
     async def get_preference_stats(self, user_id: str = "default") -> dict:
         base = await self.agent5.report()
         store_stats = self.analysis_store.preference_stats(user_id=user_id)
-        return {**base, **store_stats}
+        return {**base, **store_stats, "seed_library_count": sum(1 for e in self.strategy_library.list_entries(limit=500) if e.user_id == "*")}

@@ -65,7 +65,7 @@ def _sample_reward() -> RewardSignal:
         avg_trade_return=0.01,
         volatility=0.12,
     )
-    return RewardSignal(strategy_id="s-test", terminal_reward=0.42, backtest_result=bt)
+    return RewardSignal(strategy_id="s-test", terminal_reward=0.62, backtest_result=bt)
 
 
 @pytest.fixture
@@ -89,6 +89,9 @@ def analysis_flow(memory_manager):
     agent3._agent_run = AsyncMock(return_value=None)
     agent3.gather_context = AsyncMock(return_value={"semantic_knowledge": [], "news_digest": {}})
     agent3.generate_strategy = AsyncMock(side_effect=lambda ctx: _sample_strategy())
+    agent3.explain_strategy_and_backtest = AsyncMock(return_value="NL explanation")
+    agent3.generate_strategy_from_feedback = AsyncMock(side_effect=lambda **kw: _sample_strategy())
+    agent3.compare_strategy_outcomes = AsyncMock(return_value="Compare NL")
     agent3._extract_json = lambda raw: raw
 
     agent5 = AsyncMock()
@@ -153,11 +156,46 @@ async def test_submit_feedback_flow(analysis_flow):
     assert updated.revised_analysis.flow_type == FlowType.REVISED
     analysis_flow.agent5.on_analysis_feedback.assert_awaited_once()
 
-    compare = analysis_flow.compare_session(session.analysis_id)
+    compare = await analysis_flow.compare_session(session.analysis_id)
     assert compare["analysis_id"] == session.analysis_id
-    assert compare["baseline"]["reward"] is not None
-    assert compare["revised"]["reward"] is not None
+    assert compare["baseline"]["terminal_reward"] is not None
+    assert compare["revised"]["terminal_reward"] is not None
     assert len(analysis_flow.store.list_library()) == 2
+
+
+@pytest.mark.asyncio
+async def test_run_baseline_includes_explanation(analysis_flow):
+    analysis_flow.agent3.explain_strategy_and_backtest = AsyncMock(return_value="NL baseline explanation")
+    session = await analysis_flow.run_baseline("AAPL earnings", tickers=["AAPL"])
+    payload = analysis_flow.session_to_dict(session)
+    assert payload["baseline_explanation"] == "NL baseline explanation"
+
+
+@pytest.mark.asyncio
+async def test_submit_feedback_includes_explanations_and_compare(analysis_flow):
+    analysis_flow.agent3.explain_strategy_and_backtest = AsyncMock(side_effect=["base NL", "revised NL"])
+    analysis_flow.agent3.generate_strategy_from_feedback = AsyncMock(side_effect=lambda **kw: _sample_strategy())
+    analysis_flow.agent3.compare_strategy_outcomes = AsyncMock(return_value="Compare NL")
+    session = await analysis_flow.run_baseline("tech", tickers=["AAPL"])
+    feedback = AnalysisFeedback(
+        analysis_id=session.analysis_id,
+        user_id="default",
+        overall_verdict="partial",
+        dimension_feedbacks=[
+            DimensionFeedback(
+                dimension=FeedbackDimension.MARKET_OUTLOOK,
+                verdict="disagree",
+                correction="more neutral",
+            )
+        ],
+        free_text="more cautious",
+    )
+    updated = await analysis_flow.submit_feedback(session.analysis_id, feedback)
+    payload = analysis_flow.session_to_dict(updated)
+    assert payload["feedback_explanation"]
+    assert payload["comparison_narrative"]
+    compare = await analysis_flow.compare_session(session.analysis_id)
+    assert compare["comparison_narrative"]
 
 
 @pytest.mark.asyncio

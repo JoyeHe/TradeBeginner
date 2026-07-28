@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import uuid
 
 import structlog
@@ -18,11 +18,20 @@ from memory import MemoryManager
 from schemas.strategy import MarketRegime, Position, PositionAction, RiskMetrics, Strategy
 from tools.agno_tools import StrategyAgentTools
 
+if TYPE_CHECKING:
+    from schemas.analysis import MarketAnalysis
+    from schemas.rewards import RewardSignal
+
 logger = structlog.get_logger(__name__)
 
 STRATEGY_SYSTEM_PROMPT = """
 You are Agent 3, the strategy generation brain of a multi-agent trading system.
-Generate structured, risk-aware strategies from market data, sentiment, and memory context.
+Generate structured, risk-aware strategies from market data, sentiment, memory, and the Strategy Library.
+Prefer basing positions on library templates and their Alpha formulas when candidates are provided.
+Ground every position in real technical evidence (SMA/ROC/RSI/MACD/ADX/regime).
+Set metadata.template_id and metadata.alphas_used when you adapt a library template.
+Cite those signals briefly in rationale. Do not invent prices or indicators.
+Respect size caps and never silently drop all user-requested tickers.
 Always return valid JSON that matches the requested schema.
 """
 
@@ -34,11 +43,12 @@ class StrategyGenerationError(RuntimeError):
 class Agent3Strategy:
     """Generate and refine structured strategy actions."""
 
-    def __init__(self, settings: Settings, memory: MemoryManager, agent1=None, agent2=None):
+    def __init__(self, settings: Settings, memory: MemoryManager, agent1=None, agent2=None, library_store=None):
         self.settings = settings
         self.memory = memory
         self.agent1 = agent1
         self.agent2 = agent2
+        self.library_store = library_store
         self.agent = Agent(
             name="agent3_strategy",
             model=build_agno_model(settings),
@@ -57,12 +67,59 @@ class Agent3Strategy:
         """Assemble deterministic state for strategy generation."""
         base = await self.memory.get_strategy_context()
         working = base.get("working_memory", {})
+        snapshot = self._dump(working.get("market_snapshot"))
+        regime = None
+        if isinstance(snapshot, dict):
+            regime = (snapshot.get("market_breadth") or {}).get("regime")
+        library_candidates = []
+        if self.library_store is not None:
+            from tools.alpha_eval import eval_alpha, flatten_indicator_context
+
+            cands = self.library_store.retrieve_candidates(
+                regime=regime,
+                k=int(getattr(self.settings, "library_top_k", 5)),
+            )
+            indicators_map = {}
+            assets_map = {}
+            if isinstance(snapshot, dict):
+                indicators_map = snapshot.get("indicators") or {}
+                assets_map = snapshot.get("assets") or {}
+            for entry in cands:
+                hits = []
+                for alpha in entry.alphas or []:
+                    # Evaluate against first available asset indicators as a soft signal
+                    hit = False
+                    for tk, ind in list(indicators_map.items())[:3]:
+                        bar = assets_map.get(tk) or {}
+                        close = bar.get("close") if isinstance(bar, dict) else None
+                        ctx = flatten_indicator_context(
+                            close,
+                            ind if isinstance(ind, dict) else {},
+                            extra={"vix": snapshot.get("vix") if isinstance(snapshot, dict) else None},
+                        )
+                        if eval_alpha(alpha.expression, ctx):
+                            hit = True
+                            break
+                    hits.append({"formula_id": alpha.formula_id, "name": alpha.name, "expression": alpha.expression, "hit": hit})
+                library_candidates.append(
+                    {
+                        "template_id": entry.template_id,
+                        "name": entry.name,
+                        "description": entry.description,
+                        "tags": entry.tags,
+                        "applicable_regimes": entry.applicable_regimes,
+                        "quality_score": entry.quality_score,
+                        "skeleton": None if entry.skeleton is None else entry.skeleton.model_dump(mode="json"),
+                        "alphas": hits,
+                    }
+                )
         return {
-            "market_snapshot": self._dump(working.get("market_snapshot")),
+            "market_snapshot": snapshot,
             "news_digest": self._dump(working.get("news_digest")),
             "portfolio_state": self._dump(working.get("portfolio_state")),
             "recent_episodes": base.get("recent_episodes", []),
             "semantic_knowledge": base.get("semantic_knowledge", []),
+            "library_candidates": library_candidates,
         }
 
     async def request_additional_research(self, research_type: str, parameters: dict) -> dict:
@@ -80,7 +137,7 @@ class Agent3Strategy:
 
     def _make_prompt(self, context: dict) -> str:
         schema_json = json.dumps(Strategy.model_json_schema(), indent=2)
-        return f"""
+        prompt = f"""
 {STRATEGY_SYSTEM_PROMPT}
 
 ## Current Market Conditions
@@ -98,13 +155,33 @@ class Agent3Strategy:
 ## Relevant Market Knowledge
 {json.dumps(context.get("semantic_knowledge"), default=str, indent=2)}
 
+## Strategy Library Candidates (prefer adapting these)
+{json.dumps(context.get("library_candidates"), default=str, indent=2)}
+
 ## Market Analysis (if available)
 {json.dumps(context.get("market_analysis"), default=str, indent=2)}
+"""
+        if context.get("user_feedback") or context.get("baseline_strategy"):
+            prompt += f"""
 
+## Flow1 Baseline Strategy (do not ignore)
+{json.dumps(context.get("baseline_strategy"), default=str, indent=2)}
+
+## Flow1 Backtest / Reward
+{json.dumps(context.get("baseline_reward"), default=str, indent=2)}
+
+## User Feedback (must incorporate)
+{json.dumps(context.get("user_feedback"), default=str, indent=2)}
+
+Revise the strategy to respect the user feedback while staying consistent with the baseline analysis evidence.
+"""
+        prompt += f"""
 ## Task
 Generate one strategy as strict JSON matching this schema:
 {schema_json}
+If library candidates are present, set metadata.template_id to the chosen template_id and metadata.alphas_used to formula_ids used.
 """
+        return prompt
 
     def _extract_json(self, text: str) -> str:
         try:
@@ -347,6 +424,116 @@ Generate one strategy as strict JSON matching this schema:
         )
         result = await llm_chat(self.settings, system_prompt, user_prompt)
         return result if result.strip() else strategy.rationale
+
+    async def generate_strategy_from_feedback(
+        self,
+        baseline_analysis: "MarketAnalysis",
+        baseline_strategy: Strategy,
+        baseline_reward: Optional["RewardSignal"],
+        feedback_text: str,
+        overall_verdict: str = "partial",
+        preference_hints: Optional[list[dict]] = None,
+    ) -> Strategy:
+        """Fuse Flow1 analysis + Flow1 strategy/reward + user feedback → new Strategy."""
+        context = await self.gather_context()
+        context["market_analysis"] = baseline_analysis.model_dump(mode="json")
+        context["user_request"] = baseline_analysis.query_context
+        context["baseline_strategy"] = baseline_strategy.model_dump(mode="json")
+        context["baseline_reward"] = None if baseline_reward is None else baseline_reward.model_dump(mode="json")
+        context["user_feedback"] = {
+            "overall_verdict": overall_verdict,
+            "correction": feedback_text,
+            "preference_hints": preference_hints or [],
+        }
+        strategy = await self.generate_strategy(context)
+        strategy.analysis_id = baseline_analysis.analysis_id
+        strategy.metadata["origin"] = "post_feedback"
+        strategy.metadata["parent_strategy_id"] = baseline_strategy.strategy_id
+        strategy.data_sources_used = list(
+            set(strategy.data_sources_used + ["market_analysis", "user_feedback", "baseline_strategy"])
+        )
+        return strategy
+
+    async def explain_strategy_and_backtest(
+        self,
+        strategy: Strategy,
+        reward: Optional[RewardSignal] = None,
+        query: Optional[str] = None,
+    ) -> str:
+        """Natural-language explanation of strategy + quantitative backtest (Analysis UI)."""
+        from agents.common import llm_chat
+
+        positions_desc = "\n".join(
+            f"- {p.action.value.upper()} {p.asset}: {p.size_pct}%, SL {p.stop_loss_pct}%, "
+            f"TP {p.take_profit_pct}, {p.time_horizon_days}d, conf {p.confidence:.0%}"
+            for p in strategy.positions
+        )
+        bt_block = "Backtest: unavailable"
+        if reward is not None and reward.backtest_result is not None:
+            bt = reward.backtest_result
+            bt_block = (
+                f"Terminal reward: {reward.terminal_reward:.4f}\n"
+                f"Total return: {bt.total_return:.2%}, Sharpe: {bt.sharpe_ratio}, "
+                f"Max DD: {bt.max_drawdown:.2%}, Win rate: {bt.win_rate:.2%}, "
+                f"Trades: {bt.total_trades}, Volatility: {bt.volatility:.2%}"
+            )
+        system_prompt = (
+            "You are a trading desk analyst. Explain the strategy AND its backtest results "
+            "in clear Chinese or English matching the query language (4-8 sentences). "
+            "Cover thesis, positions, risk, and what the backtest numbers imply. "
+            "Do not invent metrics not provided."
+        )
+        user_prompt = (
+            f"Query: {query or '(none)'}\n"
+            f"Regime: {strategy.market_regime.value}\n"
+            f"Rationale: {strategy.rationale}\n"
+            f"Positions:\n{positions_desc}\n"
+            f"Exposure: {strategy.risk_metrics.total_exposure_pct}%\n"
+            f"{bt_block}\n\nWrite the explanation:"
+        )
+        result = await llm_chat(self.settings, system_prompt, user_prompt)
+        if result.strip():
+            return result.strip()
+        return (
+            f"Strategy on {strategy.market_regime.value}: {strategy.rationale[:240]}. "
+            + (f"Backtest terminal reward={reward.terminal_reward:.3f}." if reward else "No backtest.")
+        )
+
+    async def compare_strategy_outcomes(
+        self,
+        baseline_strategy: Strategy,
+        baseline_reward: Optional["RewardSignal"],
+        revised_strategy: Strategy,
+        revised_reward: Optional["RewardSignal"],
+        feedback_text: str = "",
+    ) -> str:
+        """Compare baseline vs feedback-revised strategy and backtests (Analysis UI)."""
+        from agents.common import llm_chat
+
+        def pack(s: Strategy, r: Optional["RewardSignal"]) -> dict:
+            return {
+                "strategy": s.model_dump(mode="json"),
+                "reward": None if r is None else r.model_dump(mode="json"),
+            }
+
+        system_prompt = (
+            "You compare two trading strategies and their backtests. "
+            "Explain what changed after user feedback, which metrics improved/worsened, "
+            "and a clear recommendation (4-8 sentences). Do not invent numbers."
+        )
+        user_prompt = (
+            f"User feedback: {feedback_text}\n\n"
+            f"BASELINE:\n{json.dumps(pack(baseline_strategy, baseline_reward), default=str, indent=2)}\n\n"
+            f"REVISED:\n{json.dumps(pack(revised_strategy, revised_reward), default=str, indent=2)}\n\n"
+            "Write the comparison:"
+        )
+        result = await llm_chat(self.settings, system_prompt, user_prompt)
+        if result.strip():
+            return result.strip()
+        br = None if baseline_reward is None else baseline_reward.terminal_reward
+        rr = None if revised_reward is None else revised_reward.terminal_reward
+        delta = None if br is None or rr is None else rr - br
+        return f"Baseline reward={br}, revised reward={rr}, delta={delta}. Feedback: {feedback_text}"
 
     async def _log_rl_trace(self, context: dict, prompt: str, raw_response: str, strategy: Strategy, error: Optional[str] = None) -> None:
         trace_payload = {

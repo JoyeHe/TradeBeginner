@@ -23,9 +23,16 @@ htmlcov/
 # Local runtime data
 data/chroma/
 data/openbb-ssl/
+data/strategy_library/learned.json
 *.pem
 *.key
 *.crt
+
+# Agent batch benchmarks & results (local only — do not push)
+AgentTest*.md
+UserReq*.md
+scripts/run_agent_test*.py
+data/agent_test*_run.log
 
 # OS / editor
 .DS_Store

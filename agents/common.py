@@ -10,6 +10,17 @@ from config.settings import Settings
 logger = structlog.get_logger(__name__)
 
 
+# OpenAI Chat Completions (newer) accepts role "developer"; DeepSeek and most
+# OpenAI-compatible APIs only allow system/user/assistant/tool.
+_COMPAT_ROLE_MAP = {
+    "system": "system",
+    "user": "user",
+    "assistant": "assistant",
+    "tool": "tool",
+    "model": "assistant",
+}
+
+
 def build_agno_model(settings: Settings):
     """Build an Agno model instance from settings."""
     provider = settings.llm_provider.lower()
@@ -22,12 +33,23 @@ def build_agno_model(settings: Settings):
 
         return Claude(id=settings.llm_model, api_key=settings.llm_api_key)
     if provider == "deepseek":
-        from agno.models.openai import OpenAIChat
+        from agno.models.deepseek import DeepSeek
 
-        return OpenAIChat(id=settings.llm_model, api_key=settings.llm_api_key, base_url=settings.llm_base_url)
-    from agno.models.openai import OpenAIChat
+        # DeepSeek extends OpenAILike (system→system). Do not use OpenAIChat:
+        # its default_role_map remaps system→developer and DeepSeek rejects that.
+        return DeepSeek(
+            id=settings.llm_model,
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url or "https://api.deepseek.com",
+        )
+    from agno.models.openai import OpenAILike
 
-    return OpenAIChat(id=settings.llm_model, api_key=settings.llm_api_key, base_url=settings.llm_base_url)
+    return OpenAILike(
+        id=settings.llm_model,
+        api_key=settings.llm_api_key,
+        base_url=settings.llm_base_url,
+        role_map=_COMPAT_ROLE_MAP,
+    )
 
 
 def build_openai_client(settings: Settings) -> AsyncOpenAI:

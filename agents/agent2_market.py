@@ -48,7 +48,11 @@ class Agent2Market:
 
     async def analyze_ticker(self, ticker: str) -> dict:
         """Return deep analysis details for one ticker."""
-        bars_map = await fetch_price_data([ticker], date.today() - timedelta(days=300), date.today())
+        from tools.market_tools import HISTORY_LOOKBACK_DAYS
+
+        bars_map = await fetch_price_data(
+            [ticker], date.today() - timedelta(days=HISTORY_LOOKBACK_DAYS), date.today()
+        )
         bars = bars_map.get(ticker, [])
         if not bars:
             return {"ticker": ticker, "error": "no_data"}

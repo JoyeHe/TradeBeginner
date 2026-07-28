@@ -38,3 +38,7 @@ data/agent_test*_run.log
 .DS_Store
 .idea/
 .vscode/
+
+# Legacy benchmark harness / results (do not re-add)
+test_benchmarks
+testbench

@@ -26,7 +26,12 @@ logger = structlog.get_logger(__name__)
 
 STRATEGY_SYSTEM_PROMPT = """
 You are Agent 3, the strategy generation brain of a multi-agent trading system.
-Generate structured, risk-aware strategies from market data, sentiment, and memory context.
+Generate structured, risk-aware strategies from market data, sentiment, memory, and the Strategy Library.
+Prefer basing positions on library templates and their Alpha formulas when candidates are provided.
+Ground every position in real technical evidence (SMA/ROC/RSI/MACD/ADX/regime).
+Set metadata.template_id and metadata.alphas_used when you adapt a library template.
+Cite those signals briefly in rationale. Do not invent prices or indicators.
+Respect size caps and never silently drop all user-requested tickers.
 Always return valid JSON that matches the requested schema.
 """
 
@@ -38,11 +43,12 @@ class StrategyGenerationError(RuntimeError):
 class Agent3Strategy:
     """Generate and refine structured strategy actions."""
 
-    def __init__(self, settings: Settings, memory: MemoryManager, agent1=None, agent2=None):
+    def __init__(self, settings: Settings, memory: MemoryManager, agent1=None, agent2=None, library_store=None):
         self.settings = settings
         self.memory = memory
         self.agent1 = agent1
         self.agent2 = agent2
+        self.library_store = library_store
         self.agent = Agent(
             name="agent3_strategy",
             model=build_agno_model(settings),
@@ -61,12 +67,59 @@ class Agent3Strategy:
         """Assemble deterministic state for strategy generation."""
         base = await self.memory.get_strategy_context()
         working = base.get("working_memory", {})
+        snapshot = self._dump(working.get("market_snapshot"))
+        regime = None
+        if isinstance(snapshot, dict):
+            regime = (snapshot.get("market_breadth") or {}).get("regime")
+        library_candidates = []
+        if self.library_store is not None:
+            from tools.alpha_eval import eval_alpha, flatten_indicator_context
+
+            cands = self.library_store.retrieve_candidates(
+                regime=regime,
+                k=int(getattr(self.settings, "library_top_k", 5)),
+            )
+            indicators_map = {}
+            assets_map = {}
+            if isinstance(snapshot, dict):
+                indicators_map = snapshot.get("indicators") or {}
+                assets_map = snapshot.get("assets") or {}
+            for entry in cands:
+                hits = []
+                for alpha in entry.alphas or []:
+                    # Evaluate against first available asset indicators as a soft signal
+                    hit = False
+                    for tk, ind in list(indicators_map.items())[:3]:
+                        bar = assets_map.get(tk) or {}
+                        close = bar.get("close") if isinstance(bar, dict) else None
+                        ctx = flatten_indicator_context(
+                            close,
+                            ind if isinstance(ind, dict) else {},
+                            extra={"vix": snapshot.get("vix") if isinstance(snapshot, dict) else None},
+                        )
+                        if eval_alpha(alpha.expression, ctx):
+                            hit = True
+                            break
+                    hits.append({"formula_id": alpha.formula_id, "name": alpha.name, "expression": alpha.expression, "hit": hit})
+                library_candidates.append(
+                    {
+                        "template_id": entry.template_id,
+                        "name": entry.name,
+                        "description": entry.description,
+                        "tags": entry.tags,
+                        "applicable_regimes": entry.applicable_regimes,
+                        "quality_score": entry.quality_score,
+                        "skeleton": None if entry.skeleton is None else entry.skeleton.model_dump(mode="json"),
+                        "alphas": hits,
+                    }
+                )
         return {
-            "market_snapshot": self._dump(working.get("market_snapshot")),
+            "market_snapshot": snapshot,
             "news_digest": self._dump(working.get("news_digest")),
             "portfolio_state": self._dump(working.get("portfolio_state")),
             "recent_episodes": base.get("recent_episodes", []),
             "semantic_knowledge": base.get("semantic_knowledge", []),
+            "library_candidates": library_candidates,
         }
 
     async def request_additional_research(self, research_type: str, parameters: dict) -> dict:
@@ -102,6 +155,9 @@ class Agent3Strategy:
 ## Relevant Market Knowledge
 {json.dumps(context.get("semantic_knowledge"), default=str, indent=2)}
 
+## Strategy Library Candidates (prefer adapting these)
+{json.dumps(context.get("library_candidates"), default=str, indent=2)}
+
 ## Market Analysis (if available)
 {json.dumps(context.get("market_analysis"), default=str, indent=2)}
 """
@@ -123,6 +179,7 @@ Revise the strategy to respect the user feedback while staying consistent with t
 ## Task
 Generate one strategy as strict JSON matching this schema:
 {schema_json}
+If library candidates are present, set metadata.template_id to the chosen template_id and metadata.alphas_used to formula_ids used.
 """
         return prompt
 

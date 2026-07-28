@@ -239,9 +239,53 @@ async def compare_analysis(analysis_id: str, pipeline: TradingPipeline = Depends
 async def list_strategy_library(
     user_id: str = "default",
     limit: int = 50,
+    tag: str | None = None,
+    min_reward: float | None = None,
     pipeline: TradingPipeline = Depends(get_pipeline),
 ):
-    return await pipeline.list_strategy_library(user_id=user_id, limit=limit)
+    return await pipeline.list_strategy_library(user_id=user_id, limit=limit, tag=tag, min_reward=min_reward)
+
+
+@app.get("/library/strategies/search")
+async def search_strategy_library(
+    q: str,
+    user_id: str = "default",
+    limit: int = 20,
+    pipeline: TradingPipeline = Depends(get_pipeline),
+):
+    return await pipeline.search_strategy_library(query=q, user_id=user_id, limit=limit)
+
+
+@app.get("/library/strategies/{entry_id}")
+async def get_strategy_library_entry(entry_id: str, pipeline: TradingPipeline = Depends(get_pipeline)):
+    payload = await pipeline.get_strategy_library_entry(entry_id)
+    if payload.get("status") == "not_found":
+        raise HTTPException(status_code=404, detail={"error": "library_entry_not_found", "detail": entry_id})
+    return payload
+
+
+@app.post("/library/strategies")
+async def create_strategy_library_entry(
+    payload: dict,
+    pipeline: TradingPipeline = Depends(get_pipeline),
+    _: None = Depends(require_api_key),
+):
+    from schemas.strategy_library import StrategyLibraryEntry
+
+    entry = StrategyLibraryEntry.model_validate(payload or {})
+    saved = await pipeline.analysis_store.upsert_library_entry(entry)
+    return saved.model_dump(mode="json")
+
+
+@app.post("/library/strategies/promote")
+async def promote_strategy_library_entry(
+    payload: dict,
+    pipeline: TradingPipeline = Depends(get_pipeline),
+    _: None = Depends(require_api_key),
+):
+    force = bool((payload or {}).get("force"))
+    entry = (payload or {}).get("entry") or payload
+    return await pipeline.promote_strategy_to_library(entry, force=force)
 
 
 @app.get("/library/preferences")

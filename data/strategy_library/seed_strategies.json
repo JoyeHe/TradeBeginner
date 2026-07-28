@@ -1,0 +1,1014 @@
+[
+  {
+    "template_id": "tpl_sma20_trend_long",
+    "name": "SMA20 Trend Long",
+    "description": "Price above SMA20 and SMA20 above SMA50",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_sma20_stack",
+        "name": "SMA20 stack",
+        "expression": "(close > sma_20) and (sma_20 > sma_50)",
+        "inputs": [
+          "close",
+          "sma_20",
+          "sma_50"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 15,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "sideways"
+    ],
+    "tags": [
+      "ma",
+      "trend",
+      "long"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_sma200_regime_long",
+    "name": "SMA200 Regime Long",
+    "description": "Bull regime filter via SMA200",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_sma200",
+        "name": "Above SMA200",
+        "expression": "(close > sma_200) and (sma_50 > sma_200)",
+        "inputs": [
+          "close",
+          "sma_50",
+          "sma_200"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 12,
+      "max_size_pct": 15,
+      "default_stop_pct": 5,
+      "default_tp_pct": 8,
+      "default_horizon_days": 30,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull"
+    ],
+    "tags": [
+      "ma",
+      "regime",
+      "etf"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_sma_death_de_risk",
+    "name": "SMA Breakdown De-Risk",
+    "description": "Cut risk when below key MAs",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_death",
+        "name": "Below SMA50 or SMA200",
+        "expression": "(close < sma_50) or (close < sma_200)",
+        "inputs": [
+          "close",
+          "sma_50",
+          "sma_200"
+        ],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "reduce",
+      "default_size_pct": 5,
+      "max_size_pct": 8,
+      "default_stop_pct": 4,
+      "default_tp_pct": null,
+      "default_horizon_days": 10,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bear",
+      "uncertain"
+    ],
+    "tags": [
+      "ma",
+      "derisk"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_momentum_roc20_long",
+    "name": "ROC20 Momentum Long",
+    "description": "Positive 20d momentum with trend",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_roc20",
+        "name": "ROC20 up",
+        "expression": "(momentum_roc_20 > 0) and (close > sma_20) and (rsi_14 < 75)",
+        "inputs": [
+          "momentum_roc_20",
+          "close",
+          "sma_20",
+          "rsi_14"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 5,
+      "default_tp_pct": 8,
+      "default_horizon_days": 20,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "sideways"
+    ],
+    "tags": [
+      "momentum",
+      "roc",
+      "long"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_momentum_roc20_fade",
+    "name": "Momentum Fade Trim",
+    "description": "Fade extended momentum",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_fade",
+        "name": "ROC fade",
+        "expression": "(momentum_roc_10 < 0) and (momentum_roc_20 > 5)",
+        "inputs": [
+          "momentum_roc_10",
+          "momentum_roc_20"
+        ],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "reduce",
+      "default_size_pct": 0,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": null,
+      "default_horizon_days": 5,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "volatile",
+      "bull"
+    ],
+    "tags": [
+      "momentum",
+      "fade"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_rsi_oversold_bounce",
+    "name": "RSI Oversold Bounce",
+    "description": "Mean-reversion bounce",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_rsi_os",
+        "name": "RSI oversold",
+        "expression": "(rsi_14 < 35) and (close > sma_200)",
+        "inputs": [
+          "rsi_14",
+          "close",
+          "sma_200"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 8,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 10,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "sideways",
+      "bear"
+    ],
+    "tags": [
+      "rsi",
+      "meanrev"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_rsi_overbought_trim",
+    "name": "RSI Overbought Trim",
+    "description": "Trim extended RSI",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_rsi_ob",
+        "name": "RSI OB + MACD soft",
+        "expression": "(rsi_14 > 70) and (macd_histogram < 0)",
+        "inputs": [
+          "rsi_14",
+          "macd_histogram"
+        ],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "reduce",
+      "default_size_pct": 0,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": null,
+      "default_horizon_days": 7,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull"
+    ],
+    "tags": [
+      "rsi",
+      "trim"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_macd_hist_turn_long",
+    "name": "MACD Histogram Turn Long",
+    "description": "MACD confirmation entry",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_macd_on",
+        "name": "MACD turn",
+        "expression": "(macd_histogram > 0) and (macd > macd_signal)",
+        "inputs": [
+          "macd_histogram",
+          "macd",
+          "macd_signal"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 15,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "sideways",
+      "bull"
+    ],
+    "tags": [
+      "macd",
+      "long"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_macd_hist_turn_exit",
+    "name": "MACD Histogram Exit",
+    "description": "Exit when MACD turns down",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_macd_off",
+        "name": "MACD off",
+        "expression": "(macd_histogram < 0) and (close < sma_20)",
+        "inputs": [
+          "macd_histogram",
+          "close",
+          "sma_20"
+        ],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "close",
+      "default_size_pct": 0,
+      "max_size_pct": 12,
+      "default_stop_pct": 3,
+      "default_tp_pct": null,
+      "default_horizon_days": 5,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "sideways",
+      "bear",
+      "volatile",
+      "uncertain"
+    ],
+    "tags": [
+      "macd",
+      "exit"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_adx_trend_follow",
+    "name": "ADX Trend Follow",
+    "description": "Follow strong trends",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_adx",
+        "name": "ADX trend",
+        "expression": "(adx > 25) and (close > sma_20)",
+        "inputs": [
+          "adx",
+          "close",
+          "sma_20"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 12,
+      "max_size_pct": 12,
+      "default_stop_pct": 5,
+      "default_tp_pct": 8,
+      "default_horizon_days": 20,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "bear"
+    ],
+    "tags": [
+      "adx",
+      "trend"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_adx_chop_mean_rev",
+    "name": "ADX Chop Mean Reversion",
+    "description": "Fade chop with low ADX",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_chop",
+        "name": "Low ADX RSI",
+        "expression": "(adx < 20) and (rsi_14 < 40) and (close < sma_20)",
+        "inputs": [
+          "adx",
+          "rsi_14",
+          "close",
+          "sma_20"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 8,
+      "max_size_pct": 12,
+      "default_stop_pct": 3,
+      "default_tp_pct": 5,
+      "default_horizon_days": 8,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "sideways"
+    ],
+    "tags": [
+      "adx",
+      "meanrev"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_bb_lower_reclaim",
+    "name": "Bollinger Lower Reclaim",
+    "description": "Reclaim lower band",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_bb_low",
+        "name": "BB lower",
+        "expression": "(close > bollinger_lower) and (rsi_14 < 45)",
+        "inputs": [
+          "close",
+          "bollinger_lower",
+          "rsi_14"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 8,
+      "max_size_pct": 12,
+      "default_stop_pct": 3,
+      "default_tp_pct": 5,
+      "default_horizon_days": 10,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "sideways"
+    ],
+    "tags": [
+      "bollinger",
+      "meanrev"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_bb_upper_reject",
+    "name": "Bollinger Upper Reject",
+    "description": "Reject upper band",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_bb_up",
+        "name": "BB upper reject",
+        "expression": "(close < bollinger_upper) and (rsi_14 > 65) and (momentum_roc_10 < 0)",
+        "inputs": [
+          "close",
+          "bollinger_upper",
+          "rsi_14",
+          "momentum_roc_10"
+        ],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "reduce",
+      "default_size_pct": 0,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": null,
+      "default_horizon_days": 7,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "sideways",
+      "volatile"
+    ],
+    "tags": [
+      "bollinger",
+      "trim"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_dual_ma_pullback",
+    "name": "Dual MA Pullback",
+    "description": "Buy pullback to SMA20 in uptrend",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_pb",
+        "name": "Pullback",
+        "expression": "(close > sma_50) and (close <= sma_20 * 1.01) and (rsi_14 < 55)",
+        "inputs": [
+          "close",
+          "sma_50",
+          "sma_20",
+          "rsi_14"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 7,
+      "default_horizon_days": 12,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull"
+    ],
+    "tags": [
+      "ma",
+      "pullback"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_quality_tech_sleeve",
+    "name": "Quality Tech Sleeve",
+    "description": "AAPL/MSFT style quality momentum",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_qt",
+        "name": "Quality tech",
+        "expression": "(close > sma_50) and (momentum_roc_20 > 0) and (adx > 18)",
+        "inputs": [
+          "close",
+          "sma_50",
+          "momentum_roc_20",
+          "adx"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 25,
+      "forbidden_actions": [
+        "short"
+      ]
+    },
+    "applicable_regimes": [
+      "bull",
+      "sideways"
+    ],
+    "tags": [
+      "tech",
+      "quality"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_semicap_rs_long",
+    "name": "Semicap Relative Strength",
+    "description": "Semis with ROC and ADX",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_semi",
+        "name": "Semi RS",
+        "expression": "(momentum_roc_20 > 0) and (close > sma_20) and (adx > 20)",
+        "inputs": [
+          "momentum_roc_20",
+          "close",
+          "sma_20",
+          "adx"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 8,
+      "max_size_pct": 12,
+      "default_stop_pct": 5,
+      "default_tp_pct": 10,
+      "default_horizon_days": 15,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull"
+    ],
+    "tags": [
+      "semi",
+      "momentum"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_etf_core_spy_qqq",
+    "name": "ETF Core SPY/QQQ",
+    "description": "Core ETF barbell",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_core",
+        "name": "Core SMA200",
+        "expression": "(close > sma_200) or (true)",
+        "inputs": [
+          "close",
+          "sma_200"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 15,
+      "max_size_pct": 20,
+      "default_stop_pct": 5,
+      "default_tp_pct": 8,
+      "default_horizon_days": 40,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "sideways",
+      "uncertain",
+      "bear",
+      "volatile"
+    ],
+    "tags": [
+      "etf",
+      "core"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_defensive_xlv_jnj",
+    "name": "Defensive Healthcare",
+    "description": "XLV/JNJ ballast",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_def",
+        "name": "Defensive",
+        "expression": "(close > sma_50) and (rsi_14 < 60)",
+        "inputs": [
+          "close",
+          "sma_50",
+          "rsi_14"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 30,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "uncertain",
+      "bear",
+      "sideways"
+    ],
+    "tags": [
+      "defensive",
+      "healthcare"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_vol_de_risk_vix",
+    "name": "VIX De-Risk",
+    "description": "Cut growth risk when VIX elevated",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_vix",
+        "name": "High VIX",
+        "expression": "(vix > 25)",
+        "inputs": [
+          "vix"
+        ],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "reduce",
+      "default_size_pct": 8,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": null,
+      "default_horizon_days": 10,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "volatile",
+      "uncertain"
+    ],
+    "tags": [
+      "vix",
+      "derisk"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_pair_long_weak_short_strong",
+    "name": "Relative Strength Pair",
+    "description": "Prefer stronger name; hedge weaker via ETF",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_rs",
+        "name": "RS long",
+        "expression": "(momentum_roc_20 > 0) and (adx < 25)",
+        "inputs": [
+          "momentum_roc_20",
+          "adx"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 8,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 15,
+      "forbidden_actions": [
+        "short"
+      ]
+    },
+    "applicable_regimes": [
+      "sideways"
+    ],
+    "tags": [
+      "pair",
+      "relative"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_earnings_caution_small",
+    "name": "Earnings Caution Small",
+    "description": "Small size around events",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_ev",
+        "name": "Always caution",
+        "expression": "(true)",
+        "inputs": [],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 6,
+      "max_size_pct": 8,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 10,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "sideways",
+      "uncertain",
+      "volatile",
+      "bear"
+    ],
+    "tags": [
+      "event",
+      "caution"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_crypto_satellite_tiny",
+    "name": "Crypto Satellite Tiny",
+    "description": "BTC learning sleeve capped",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_btc",
+        "name": "BTC mom",
+        "expression": "(momentum_roc_20 > 0)",
+        "inputs": [
+          "momentum_roc_20"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 3,
+      "max_size_pct": 3,
+      "default_stop_pct": 6,
+      "default_tp_pct": 12,
+      "default_horizon_days": 20,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "uncertain",
+      "volatile",
+      "bull"
+    ],
+    "tags": [
+      "crypto",
+      "satellite"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_post_correction_rsi_sma",
+    "name": "Post-Correction Bounce",
+    "description": "RSI reclaim SMA20 after washout",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_bounce",
+        "name": "Bounce",
+        "expression": "(rsi_14 < 40) and (close > sma_20)",
+        "inputs": [
+          "rsi_14",
+          "close",
+          "sma_20"
+        ],
+        "direction": "long",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "long",
+      "default_size_pct": 10,
+      "max_size_pct": 12,
+      "default_stop_pct": 4,
+      "default_tp_pct": 6,
+      "default_horizon_days": 12,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bear",
+      "sideways"
+    ],
+    "tags": [
+      "bounce",
+      "rsi"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  },
+  {
+    "template_id": "tpl_gross_exposure_cap",
+    "name": "Gross Exposure Cap Meta",
+    "description": "Post-process template to cap gross exposure",
+    "user_id": "*",
+    "source_analysis_id": "seed",
+    "alphas": [
+      {
+        "formula_id": "a_meta",
+        "name": "Meta always",
+        "expression": "(true)",
+        "inputs": [],
+        "direction": "flat",
+        "lookback_hint_days": 60,
+        "notes": ""
+      }
+    ],
+    "skeleton": {
+      "default_action": "reduce",
+      "default_size_pct": 0,
+      "max_size_pct": 0,
+      "default_stop_pct": 4,
+      "default_tp_pct": null,
+      "default_horizon_days": 1,
+      "forbidden_actions": []
+    },
+    "applicable_regimes": [
+      "bull",
+      "bear",
+      "sideways",
+      "volatile",
+      "uncertain"
+    ],
+    "tags": [
+      "meta",
+      "risk"
+    ],
+    "origin": "seed",
+    "quality_score": 0.55,
+    "strategy": null
+  }
+]

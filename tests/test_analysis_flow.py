@@ -65,7 +65,7 @@ def _sample_reward() -> RewardSignal:
         avg_trade_return=0.01,
         volatility=0.12,
     )
-    return RewardSignal(strategy_id="s-test", terminal_reward=0.42, backtest_result=bt)
+    return RewardSignal(strategy_id="s-test", terminal_reward=0.62, backtest_result=bt)
 
 
 @pytest.fixture

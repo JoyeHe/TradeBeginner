@@ -216,6 +216,20 @@ async def test_compute_technical_indicators_sma(synthetic_ohlcv_df: pd.DataFrame
 
 
 @pytest.mark.asyncio
+async def test_compute_technical_indicators_momentum_roc(synthetic_ohlcv_df: pd.DataFrame):
+    """FUNCTION TESTED: tools.market_tools.compute_technical_indicators momentum ROC"""
+    bars = _bars_from_df(synthetic_ohlcv_df, "TEST")
+    ind = await market_tools.compute_technical_indicators(bars)
+    close = synthetic_ohlcv_df["close"]
+    roc10 = float((close.iloc[-1] / close.iloc[-11] - 1.0) * 100.0)
+    roc20 = float((close.iloc[-1] / close.iloc[-21] - 1.0) * 100.0)
+    assert ind.momentum_roc_10 is not None
+    assert ind.momentum_roc_20 is not None
+    assert abs(ind.momentum_roc_10 - roc10) < 1e-6
+    assert abs(ind.momentum_roc_20 - roc20) < 1e-6
+
+
+@pytest.mark.asyncio
 async def test_compute_technical_indicators_bollinger_bands(synthetic_ohlcv_df: pd.DataFrame):
     """FUNCTION TESTED: tools.market_tools.compute_technical_indicators Bollinger"""
     bars = _bars_from_df(synthetic_ohlcv_df, "TEST")

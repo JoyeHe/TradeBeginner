@@ -731,7 +731,21 @@ $("btnCompareAnalysis").onclick=async()=>{
     log("analysis_compare",out);
   }catch(e){pretty("compareResults",e);}
 };
-$("btnRefreshLibrary").onclick=async()=>{try{pretty("libraryResults",await call("/library/strategies"));}catch(e){pretty("libraryResults",e);}};
+$("btnRefreshLibrary").onclick=async()=>{
+  try{
+    const rows=await call("/library/strategies?limit=50");
+    if(!Array.isArray(rows)){pretty("libraryResults",rows);return;}
+    const summary=rows.map(r=>({
+      name:r.name||r.template_id||r.entry_id,
+      origin:r.origin,
+      tags:(r.tags||[]).slice(0,4),
+      quality:r.quality_score,
+      reward:r.backtest_reward,
+      alphas:(r.alphas||[]).map(a=>a.formula_id||a.name).slice(0,2),
+    }));
+    pretty("libraryResults",{count:rows.length,entries:summary});
+  }catch(e){pretty("libraryResults",e);}
+};
 $("btnRefreshPrefs").onclick=async()=>{try{pretty("libraryResults",await call("/library/preferences"));}catch(e){pretty("libraryResults",e);}};
 $("analysisQuery").addEventListener("keydown",e=>{if(e.key==="Enter")$("btnRunBaseline").click();});
 

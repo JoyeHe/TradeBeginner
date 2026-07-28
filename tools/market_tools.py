@@ -19,6 +19,10 @@ from schemas.strategy import MarketRegime
 
 logger = structlog.get_logger(__name__)
 
+# Calendar-day lookback so daily bars cover SMA(200) (~210 trading days + buffer).
+# 280 calendar days ≈ 190 sessions and caused permanent UNCERTAIN / sma_200=None.
+HISTORY_LOOKBACK_DAYS = 420
+
 try:
     from openbb import obb  # type: ignore
 except Exception:  # pragma: no cover
@@ -200,6 +204,9 @@ async def compute_technical_indicators(ohlcv_data: list[OHLCVBar]) -> TechnicalI
         x = series.iloc[-1] if not series.empty else np.nan
         return None if pd.isna(x) else float(x)
 
+    roc10 = (close / close.shift(10) - 1.0) * 100.0
+    roc20 = (close / close.shift(20) - 1.0) * 100.0
+
     return TechnicalIndicators(
         asset=asset,
         timestamp=ts,
@@ -210,6 +217,8 @@ async def compute_technical_indicators(ohlcv_data: list[OHLCVBar]) -> TechnicalI
         sma_200=v(close.rolling(200).mean()),
         ema_12=v(ema12),
         ema_26=v(ema26),
+        momentum_roc_10=v(roc10),
+        momentum_roc_20=v(roc20),
         bollinger_bands={"upper": v(bb_mid + 2 * bb_std), "middle": v(bb_mid), "lower": v(bb_mid - 2 * bb_std)},
         atr_14=v(atr14),
         volume_sma_20=v(volume.rolling(20).mean()),
@@ -221,30 +230,53 @@ async def compute_technical_indicators(ohlcv_data: list[OHLCVBar]) -> TechnicalI
 async def detect_market_regime() -> tuple[MarketRegime, float, dict]:
     """Classify current regime using SPY and VIX proxies."""
     today = date.today()
-    bars = await fetch_price_data(["SPY", "^VIX"], today - timedelta(days=280), today, interval="1d")
+    bars = await fetch_price_data(["SPY", "^VIX"], today - timedelta(days=HISTORY_LOOKBACK_DAYS), today, interval="1d")
     spy = bars.get("SPY", [])
     vix = bars.get("^VIX", [])
     if len(spy) < 210:
-        return (MarketRegime.UNCERTAIN, 0.2, {"reason": "insufficient_data"})
+        return (
+            MarketRegime.UNCERTAIN,
+            0.2,
+            {"reason": "insufficient_data", "spy_bars": len(spy), "lookback_days": HISTORY_LOOKBACK_DAYS},
+        )
     ind = await compute_technical_indicators(spy)
     vix_close = vix[-1].close if vix else None
-    evidence = {"spy_close": spy[-1].close, "sma200": ind.sma_200, "sma50": ind.sma_50, "rsi": ind.rsi_14, "vix": vix_close}
-    if ind.sma_200 and ind.sma_50 and ind.rsi_14 and vix_close is not None:
-        if spy[-1].close > ind.sma_200 and ind.sma_50 > ind.sma_200 and ind.rsi_14 > 50 and vix_close < 20:
-            return (MarketRegime.BULL, 0.8, evidence)
-        if spy[-1].close < ind.sma_200 and ind.sma_50 < ind.sma_200 and ind.rsi_14 < 50 and vix_close > 25:
-            return (MarketRegime.BEAR, 0.8, evidence)
-        if (ind.adx or 30) < 20:
-            return (MarketRegime.SIDEWAYS, 0.6, evidence)
-        if vix_close > 30:
-            return (MarketRegime.VOLATILE, 0.8, evidence)
+    evidence = {
+        "spy_close": spy[-1].close,
+        "sma200": ind.sma_200,
+        "sma50": ind.sma_50,
+        "rsi": ind.rsi_14,
+        "momentum_roc_20": ind.momentum_roc_20,
+        "vix": vix_close,
+        "spy_bars": len(spy),
+    }
+    if not (ind.sma_200 and ind.sma_50 and ind.rsi_14 is not None):
+        return (MarketRegime.UNCERTAIN, 0.4, evidence)
+
+    above_long = spy[-1].close > ind.sma_200 and ind.sma_50 > ind.sma_200
+    below_long = spy[-1].close < ind.sma_200 and ind.sma_50 < ind.sma_200
+    # VIX refines confidence; SMA/RSI alone still classify when VIX is missing.
+    if above_long and ind.rsi_14 > 50 and (vix_close is None or vix_close < 20):
+        return (MarketRegime.BULL, 0.8 if vix_close is not None else 0.65, evidence)
+    if below_long and ind.rsi_14 < 50 and (vix_close is None or vix_close > 25):
+        return (MarketRegime.BEAR, 0.8 if vix_close is not None else 0.65, evidence)
+    if vix_close is not None and vix_close > 30:
+        return (MarketRegime.VOLATILE, 0.8, evidence)
+    # Momentum tilt reduces sticky "sideways" when ADX is moderate
+    roc = ind.momentum_roc_20
+    if above_long and roc is not None and roc > 2 and (ind.adx or 0) >= 18:
+        return (MarketRegime.BULL, 0.6, evidence)
+    if below_long and roc is not None and roc < -2 and (ind.adx or 0) >= 18:
+        return (MarketRegime.BEAR, 0.6, evidence)
+    if (ind.adx or 30) < 20:
+        return (MarketRegime.SIDEWAYS, 0.6, evidence)
     return (MarketRegime.UNCERTAIN, 0.4, evidence)
 
 
 async def build_market_snapshot(watchlist: list[str]) -> MarketSnapshot:
     """Build complete snapshot including indicators and sector ETFs."""
     today = date.today()
-    price = await fetch_price_data(watchlist, today - timedelta(days=300), today, interval="1d")
+    price = await fetch_price_data(watchlist, today - timedelta(days=HISTORY_LOOKBACK_DAYS), today, interval="1d")
     assets: dict[str, OHLCVBar] = {}
     indicators: dict[str, TechnicalIndicators] = {}
     for ticker, bars in price.items():
@@ -336,9 +368,9 @@ async def user_market_lookup(
 
     today = date.today()
     try:
-        sd = date.fromisoformat(start_date) if start_date else today - timedelta(days=100)
+        sd = date.fromisoformat(start_date) if start_date else today - timedelta(days=HISTORY_LOOKBACK_DAYS)
     except ValueError:
-        sd = today - timedelta(days=100)
+        sd = today - timedelta(days=HISTORY_LOOKBACK_DAYS)
     try:
         ed = date.fromisoformat(end_date) if end_date else today
     except ValueError:
@@ -370,6 +402,9 @@ async def user_market_lookup(
                 "rsi_14": ind.rsi_14,
                 "sma_20": ind.sma_20,
                 "sma_50": ind.sma_50,
+                "sma_200": ind.sma_200,
+                "momentum_roc_10": ind.momentum_roc_10,
+                "momentum_roc_20": ind.momentum_roc_20,
                 "macd": ind.macd,
                 "bollinger_bands": ind.bollinger_bands,
                 "atr_14": ind.atr_14,
@@ -390,7 +425,7 @@ async def screen_stocks(criteria: dict) -> list[str]:
     """Basic stock screener over a small starter universe."""
     universe = criteria.get("universe", ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "JPM", "XOM", "BTC-USD"])
     today = date.today()
-    bars_map = await fetch_price_data(universe, today - timedelta(days=300), today)
+    bars_map = await fetch_price_data(universe, today - timedelta(days=HISTORY_LOOKBACK_DAYS), today)
     result = []
     for ticker, bars in bars_map.items():
         if len(bars) < 30:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Optional
 
 import numpy as np
@@ -21,6 +21,7 @@ logger = structlog.get_logger(__name__)
 class TradeOutcome:
     returns: float
     won: bool
+    size_pct: float = 100.0
 
 
 def _norm(value: float, low: float, high: float) -> float:
@@ -35,7 +36,10 @@ async def run_backtest(
     initial_capital: float = 100000.0,
     commission_pct: float = 0.001,
 ) -> BacktestResult:
-    """Run mechanical simulation from strategy against historical data."""
+    """Run mechanical simulation from strategy against historical data.
+
+    Position PnL is weighted by size_pct/100 so allocation changes affect total_return.
+    """
     outcomes: list[TradeOutcome] = []
     partial_data = False
     for pos in strategy.positions:
@@ -70,22 +74,44 @@ async def run_backtest(
 
         gross = side * ((exit_price - entry_price) / entry_price)
         net = gross - commission_pct * 2
-        outcomes.append(TradeOutcome(returns=net, won=net > 0))
+        outcomes.append(TradeOutcome(returns=net, won=net > 0, size_pct=float(pos.size_pct)))
 
-    returns = np.array([o.returns for o in outcomes], dtype=float) if outcomes else np.array([0.0])
-    total_return = float(np.sum(returns))
-    vol = float(np.std(returns)) if len(returns) > 1 else 0.0
-    sharpe = float(np.mean(returns) / vol) if vol > 1e-9 else 0.0
-    cum = np.cumprod(1 + returns)
-    peaks = np.maximum.accumulate(cum)
-    drawdown = ((cum - peaks) / peaks) if len(cum) else np.array([0.0])
-    max_dd = abs(float(np.min(drawdown))) if len(drawdown) else 0.0
-    win_rate = float(np.mean([o.won for o in outcomes])) if outcomes else 0.0
-    profit_factor = None
-    profits = returns[returns > 0].sum()
-    losses = abs(returns[returns < 0].sum())
-    if losses > 0:
-        profit_factor = float(profits / losses)
+    if outcomes:
+        raw = np.array([o.returns for o in outcomes], dtype=float)
+        weights = np.array([o.size_pct / 100.0 for o in outcomes], dtype=float)
+        weighted = raw * weights
+        total_return = float(np.sum(weighted))
+        # Equity path for drawdown: start 1.0, apply weighted period returns sequentially
+        equity = np.cumprod(1.0 + weighted)
+        peaks = np.maximum.accumulate(equity)
+        drawdown = (equity - peaks) / peaks
+        max_dd = abs(float(np.min(drawdown))) if len(drawdown) else 0.0
+        # Floor: a single losing trade must show drawdown at least |loss|
+        loss_floor = abs(float(np.min(np.minimum(weighted, 0.0)))) if len(weighted) else 0.0
+        max_dd = max(max_dd, loss_floor)
+        win_rate = float(np.mean([o.won for o in outcomes]))
+        vol = float(np.std(weighted)) if len(weighted) > 1 else 0.0
+        avg_trade = float(np.mean(weighted))
+        profits = float(weighted[weighted > 0].sum())
+        losses = abs(float(weighted[weighted < 0].sum()))
+        profit_factor = float(profits / losses) if losses > 0 else None
+        n = len(outcomes)
+        if n >= 2 and vol > 1e-9:
+            sharpe = float(np.mean(weighted) / vol)
+            sharpe = float(max(-4.0, min(4.0, sharpe)))
+        elif n < 2:
+            sharpe = None
+        else:
+            sharpe = 0.0
+    else:
+        total_return = 0.0
+        max_dd = 0.0
+        win_rate = 0.0
+        vol = 0.0
+        avg_trade = 0.0
+        profit_factor = None
+        sharpe = None
+        n = 0
 
     all_dates = sorted({idx for df in historical_data.values() for idx in df.index})
     bt_start = all_dates[0] if all_dates else datetime.now(timezone.utc)
@@ -99,8 +125,8 @@ async def run_backtest(
         max_drawdown=max_dd,
         win_rate=win_rate,
         profit_factor=profit_factor,
-        total_trades=len(outcomes),
-        avg_trade_return=float(np.mean(returns)) if len(returns) else 0.0,
+        total_trades=n,
+        avg_trade_return=avg_trade,
         volatility=vol,
         partial_data=partial_data,
     )
@@ -108,7 +134,13 @@ async def run_backtest(
 
 async def compute_reward(result: BacktestResult, settings: Settings) -> RewardSignal:
     """Compute weighted reward signal from backtest metrics."""
-    sharpe_term = _norm(result.sharpe_ratio or 0.0, -2.0, 4.0)
+    min_trades = getattr(settings, "min_trades_for_sharpe", 5)
+    low_sample = result.total_trades < min_trades
+    if result.sharpe_ratio is None or low_sample:
+        sharpe_term = 0.5  # neutral — avoid degenerate 0.467 lock-in from sharpe=0 + dd=0
+    else:
+        clipped = max(-2.0, min(4.0, float(result.sharpe_ratio)))
+        sharpe_term = _norm(clipped, -2.0, 4.0)
     drawdown_term = 1.0 - _norm(result.max_drawdown, 0.0, 0.5)
     win_term = _norm(result.win_rate, 0.0, 1.0)
     reward = (
@@ -116,11 +148,18 @@ async def compute_reward(result: BacktestResult, settings: Settings) -> RewardSi
         + settings.reward_weight_drawdown * drawdown_term
         + settings.reward_weight_winrate * win_term
     )
+    if low_sample:
+        reward *= 0.85  # down-weight unreliable samples
     reward = float(max(-1.0, min(1.0, reward)))
     return RewardSignal(
         strategy_id=result.strategy_id,
         terminal_reward=reward,
-        component_rewards={"sharpe": sharpe_term, "drawdown_penalty": drawdown_term, "win_rate": win_term},
+        component_rewards={
+            "sharpe": sharpe_term,
+            "drawdown_penalty": drawdown_term,
+            "win_rate": win_term,
+            "low_sample": 1.0 if low_sample else 0.0,
+        },
         backtest_result=result,
     )
 
@@ -174,7 +213,7 @@ async def compare_strategies(items: list[tuple[Strategy, BacktestResult]]) -> di
     """Compare strategies with simple ranking metrics."""
     ranked = sorted(
         items,
-        key=lambda p: ((p[1].sharpe_ratio or -99), p[1].total_return, -p[1].max_drawdown),
+        key=lambda p: ((p[1].sharpe_ratio if p[1].sharpe_ratio is not None else -99), p[1].total_return, -p[1].max_drawdown),
         reverse=True,
     )
     return {
@@ -188,4 +227,3 @@ async def compare_strategies(items: list[tuple[Strategy, BacktestResult]]) -> di
             for strategy, result in ranked
         ]
     }
-

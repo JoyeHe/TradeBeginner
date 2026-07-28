@@ -26,6 +26,9 @@ class TechnicalIndicators(BaseModel):
     sma_200: Optional[float] = None
     ema_12: Optional[float] = None
     ema_26: Optional[float] = None
+    # Rate-of-change momentum: (close / close.shift(N) - 1) * 100
+    momentum_roc_10: Optional[float] = None
+    momentum_roc_20: Optional[float] = None
     bollinger_bands: Optional[dict] = None
     atr_14: Optional[float] = None
     volume_sma_20: Optional[float] = None

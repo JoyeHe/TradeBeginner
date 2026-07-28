@@ -80,7 +80,9 @@ async def test_gather_context_all_sources(monkeypatch: pytest.MonkeyPatch, base_
         "portfolio_state",
         "recent_episodes",
         "semantic_knowledge",
+        "library_candidates",
     }
+    assert context["library_candidates"] == []
     assert context["market_snapshot"] is not None
     assert context["recent_episodes"]
     assert context["semantic_knowledge"]
